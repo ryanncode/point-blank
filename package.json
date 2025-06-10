@@ -11,11 +11,15 @@
   ],
   "activationEvents": [
     "onLanguage:plaintext",
-    "onLanguage:markdown"
+    "onLanguage:markdown",
+    "onMarkdownPreview"
   ],
   "main": "./dist/extension.js",
   "contributes": {
-    "commands": []
+    "markdown.markdownItPlugins": true,
+    "commands": [
+      
+    ]
   },
   "scripts": {
     "vscode:prepublish": "pnpm run package",

@@ -62,6 +62,24 @@ class IndentFoldingRangeProvider implements vscode.FoldingRangeProvider {
     }
 }
 
+// Helper function to check if a line should be excluded from bullet points (excluding fenced code blocks, which are handled by state).
+function isExcludedLine(line: vscode.TextLine): boolean {
+    const text = line.text.trim();
+    // Markdown ATX headers: #, ##, etc.
+    if (text.match(/^#+\s/)) {
+        return true;
+    }
+    // Setext header underlines: === or --- (at least 3 characters)
+    if (text.match(/^[=-]{3,}$/)) {
+        return true;
+    }
+    // Horizontal rules: ***, ---, ___ (at least 3 characters, with optional spaces)
+    if (text.match(/^(\* *){3,}$|^(- *){3,}$|^(_ *){3,}$/)) {
+        return true;
+    }
+    return false;
+}
+
 // Main activation function
 export function activate(context: vscode.ExtensionContext) {
     let activeEditor = vscode.window.activeTextEditor;
@@ -83,15 +101,36 @@ export function activate(context: vscode.ExtensionContext) {
         }
 
         const bulletDecorations: vscode.DecorationOptions[] = [];
+        let inCodeBlock = false; // State to track if we are inside a fenced code block
+
         for (let i = 0; i < document.lineCount; i++) {
             const line = document.lineAt(i);
-            if (line.isEmptyOrWhitespace) continue;
-            
-            // Only apply decoration if this line is the start of a folding range
-            if (startLines.has(i)) {
-                const range = new vscode.Range(i, line.firstNonWhitespaceCharacterIndex, i, line.firstNonWhitespaceCharacterIndex);
-                bulletDecorations.push({ range });
+            const text = line.text.trim();
+
+            // Toggle inCodeBlock state for fenced code block delimiters
+            if (text.startsWith('```')) {
+                inCodeBlock = !inCodeBlock;
+                continue; // Exclude the delimiter line itself
             }
+
+            // Exclude lines inside a fenced code block
+            if (inCodeBlock) {
+                continue;
+            }
+
+            // Exclude empty or whitespace-only lines
+            if (line.isEmptyOrWhitespace) {
+                continue;
+            }
+            
+            // Exclude other types of excluded lines (headers, horizontal rules)
+            if (isExcludedLine(line)) {
+                continue;
+            }
+
+            // Apply decoration to all non-excluded lines
+            const range = new vscode.Range(i, line.firstNonWhitespaceCharacterIndex, i, line.firstNonWhitespaceCharacterIndex);
+            bulletDecorations.push({ range });
         }
         activeEditor.setDecorations(bulletDecorationType, bulletDecorations);
     }
@@ -100,7 +139,7 @@ export function activate(context: vscode.ExtensionContext) {
     // You can add more language identifiers here.
     context.subscriptions.push(
         vscode.languages.registerFoldingRangeProvider(
-            ['plaintext', 'markdown'], 
+            ['plaintext', 'markdown', 'untitled'],
             new IndentFoldingRangeProvider()
         )
     );
