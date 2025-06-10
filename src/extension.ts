@@ -13,6 +13,19 @@ const bulletDecorationType = vscode.window.createTextEditorDecorationType({
     rangeBehavior: vscode.DecorationRangeBehavior.ClosedOpen,
 });
 
+// Define decoration types for custom bullet points.
+const starBulletDecorationType = vscode.window.createTextEditorDecorationType({
+    color: new vscode.ThemeColor('editorWarning.foreground'), // Subtle yellow/gold
+});
+
+const plusBulletDecorationType = vscode.window.createTextEditorDecorationType({
+    color: new vscode.ThemeColor('editorGutter.addedBackground'), // Subtle green
+});
+
+const minusBulletDecorationType = vscode.window.createTextEditorDecorationType({
+    color: new vscode.ThemeColor('editorGutter.deletedBackground'), // Subtle red
+});
+
 /**
  * A class that provides folding ranges based on indentation.
  */
@@ -101,6 +114,9 @@ export function activate(context: vscode.ExtensionContext) {
         }
 
         const bulletDecorations: vscode.DecorationOptions[] = [];
+        const starBulletDecorations: vscode.DecorationOptions[] = [];
+        const plusBulletDecorations: vscode.DecorationOptions[] = [];
+        const minusBulletDecorations: vscode.DecorationOptions[] = [];
         let inCodeBlock = false; // State to track if we are inside a fenced code block
 
         for (let i = 0; i < document.lineCount; i++) {
@@ -128,11 +144,34 @@ export function activate(context: vscode.ExtensionContext) {
                 continue;
             }
 
-            // Apply decoration to all non-excluded lines
-            const range = new vscode.Range(i, line.firstNonWhitespaceCharacterIndex, i, line.firstNonWhitespaceCharacterIndex);
+            const firstCharIndex = line.firstNonWhitespaceCharacterIndex;
+            const firstChar = line.text.charAt(firstCharIndex);
+
+            // Check for custom bullet points (*, +, -) and apply specific decoration
+            if (firstChar === '*' && line.text.charAt(firstCharIndex + 1) === ' ') {
+                const range = new vscode.Range(i, firstCharIndex, i, firstCharIndex + 1);
+                starBulletDecorations.push({ range });
+                continue;
+            }
+            if (firstChar === '+' && line.text.charAt(firstCharIndex + 1) === ' ') {
+                const range = new vscode.Range(i, firstCharIndex, i, firstCharIndex + 1);
+                plusBulletDecorations.push({ range });
+                continue;
+            }
+            if (firstChar === '-' && line.text.charAt(firstCharIndex + 1) === ' ') {
+                const range = new vscode.Range(i, firstCharIndex, i, firstCharIndex + 1);
+                minusBulletDecorations.push({ range });
+                continue;
+            }
+
+            // Apply default bullet decoration to all other non-excluded lines
+            const range = new vscode.Range(i, firstCharIndex, i, firstCharIndex);
             bulletDecorations.push({ range });
         }
         activeEditor.setDecorations(bulletDecorationType, bulletDecorations);
+        activeEditor.setDecorations(starBulletDecorationType, starBulletDecorations);
+        activeEditor.setDecorations(plusBulletDecorationType, plusBulletDecorations);
+        activeEditor.setDecorations(minusBulletDecorationType, minusBulletDecorations);
     }
 
     // Register our new FoldingRangeProvider for plain text and markdown files.
