@@ -1,65 +1,101 @@
+// ---- src/extension.ts ----
 // This is the main logic file for the extension.
 
 import * as vscode from 'vscode';
 
-// Define the decoration type. This is created once and reused.
-// We are using a simple bullet character '•' as the content.
+// Define the decoration type for the bullet points.
 const bulletDecorationType = vscode.window.createTextEditorDecorationType({
-    // Use 'before' to place the content before the actual line content
     before: {
         contentText: '•',
-        color: new vscode.ThemeColor('editor.foreground'), // Use theme's foreground color
-        margin: '0 1em 0 0' // Add some margin to the right of the bullet
+        color: new vscode.ThemeColor('editor.foreground'),
+        margin: '0 1em 0 0',
     },
-    // This makes the decoration apply to the start of the line
-    rangeBehavior: vscode.DecorationRangeBehavior.ClosedOpen
+    rangeBehavior: vscode.DecorationRangeBehavior.ClosedOpen,
 });
 
-// This function gets called when the extension is activated
-export function activate(context: vscode.ExtensionContext) {
+/**
+ * A class that provides folding ranges based on indentation.
+ */
+class IndentFoldingRangeProvider implements vscode.FoldingRangeProvider {
+    provideFoldingRanges(
+        document: vscode.TextDocument,
+        context: vscode.FoldingContext,
+        token: vscode.CancellationToken
+    ): vscode.ProviderResult<vscode.FoldingRange[]> {
+        const ranges: vscode.FoldingRange[] = [];
+        const stack: { indent: number; startLine: number }[] = [];
 
+        for (let i = 0; i < document.lineCount; i++) {
+            const line = document.lineAt(i);
+            if (line.isEmptyOrWhitespace) {
+                continue;
+            }
+
+            const currentIndent = line.firstNonWhitespaceCharacterIndex;
+
+            // While the current line's indent is less than or equal to the
+            // indent of the last item on the stack, we've finished a folding block.
+            while (stack.length > 0 && currentIndent <= stack[stack.length - 1].indent) {
+                const top = stack.pop()!;
+                // The fold ends on the line *before* the current one.
+                if (i > top.startLine) {
+                    ranges.push(new vscode.FoldingRange(top.startLine, i - 1));
+                }
+            }
+
+            // If the next line is more indented, start a new folding range.
+            if (i + 1 < document.lineCount) {
+                const nextLine = document.lineAt(i + 1);
+                if (!nextLine.isEmptyOrWhitespace && nextLine.firstNonWhitespaceCharacterIndex > currentIndent) {
+                    stack.push({ indent: currentIndent, startLine: i });
+                }
+            }
+        }
+
+        // Close any remaining open folds at the end of the file.
+        while (stack.length > 0) {
+            const top = stack.pop()!;
+            ranges.push(new vscode.FoldingRange(top.startLine, document.lineCount - 1));
+        }
+
+        return ranges;
+    }
+}
+
+// Main activation function
+export function activate(context: vscode.ExtensionContext) {
     let activeEditor = vscode.window.activeTextEditor;
 
-    // This function will apply the decorations
     function updateDecorations() {
         if (!activeEditor) {
             return;
         }
-
-        const regEx = /^\s*/; // Regular expression to find leading whitespace
+        // Simplified decoration logic (no changes here)
         const text = activeEditor.document.getText();
         const bulletDecorations: vscode.DecorationOptions[] = [];
-        const lines = text.split('\n');
-
-        lines.forEach((line, i) => {
-            // Ignore empty lines
-            if (line.trim().length === 0) {
-                return;
-            }
-
-            const match = line.match(regEx);
-            if (match) {
-                const indentLength = match[0].length;
-                
-                // Position the decoration at the start of the line, right after the indentation
-                const position = new vscode.Position(i, indentLength);
-                const range = new vscode.Range(position, position);
-
-                const decoration = { range };
-                bulletDecorations.push(decoration);
-            }
-        });
-        
-        // Apply all decorations at once
+        for (let i = 0; i < activeEditor.document.lineCount; i++) {
+            const line = activeEditor.document.lineAt(i);
+            if (line.isEmptyOrWhitespace) continue;
+            
+            const range = new vscode.Range(i, line.firstNonWhitespaceCharacterIndex, i, line.firstNonWhitespaceCharacterIndex);
+            bulletDecorations.push({ range });
+        }
         activeEditor.setDecorations(bulletDecorationType, bulletDecorations);
     }
 
-    // Initial call to decorate the active editor
+    // Register our new FoldingRangeProvider for plain text and markdown files.
+    // You can add more language identifiers here.
+    context.subscriptions.push(
+        vscode.languages.registerFoldingRangeProvider(
+            ['plaintext', 'markdown'], 
+            new IndentFoldingRangeProvider()
+        )
+    );
+
     if (activeEditor) {
         updateDecorations();
     }
 
-    // Listen for when the active editor changes
     vscode.window.onDidChangeActiveTextEditor(editor => {
         activeEditor = editor;
         if (editor) {
@@ -67,7 +103,6 @@ export function activate(context: vscode.ExtensionContext) {
         }
     }, null, context.subscriptions);
 
-    // Listen for changes in the text document to re-apply decorations
     vscode.workspace.onDidChangeTextDocument(event => {
         if (activeEditor && event.document === activeEditor.document) {
             updateDecorations();
@@ -75,5 +110,5 @@ export function activate(context: vscode.ExtensionContext) {
     }, null, context.subscriptions);
 }
 
-// This function is called when your extension is deactivated
 export function deactivate() {}
+
