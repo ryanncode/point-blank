@@ -1,0 +1,29 @@
+# Node.js and pnpm
+node_modules/
+dist/
+out/
+.pnpm-store/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm/
+.yarn/
+
+# TypeScript compilation artifacts
+*.js
+*.js.map
+*.d.ts
+
+# VS Code Extension specific
+*.vsix
+.vscode-test-results/
+
+# Editor and OS specific
+.vscode/
+.DS_Store
+Thumbs.db
+README-default.md
+vsc-extension-quickstart.md
+
+# Logs
+*.log
