@@ -27,7 +27,7 @@ const minusBulletDecorationType = vscode.window.createTextEditorDecorationType({
 });
 
 const numberedBulletDecorationType = vscode.window.createTextEditorDecorationType({
-    color: new vscode.ThemeColor('editorBracketHighlight.foreground3'), // A nice orange color
+    color: new vscode.ThemeColor('editorBracketHighlight.foreground3'), // A subtle orange/yellow color
 });
 
 /**
@@ -169,14 +169,12 @@ export function activate(context: vscode.ExtensionContext) {
                 continue;
             }
 
-            // Check for numbered lines (e.g., "1. ", "2. ", etc.)
-            if (text.match(/^\d+\.\s/)) {
-                const match = text.match(/^\d+\./);
-                if (match) {
-                    const range = new vscode.Range(i, firstCharIndex, i, firstCharIndex + match[0].length);
-                    numberedBulletDecorations.push({ range });
-                    continue;
-                }
+            // Check for numbered lines (e.g., "1. ", "2) ", etc.)
+            const numberedMatch = text.match(/^(\d+[\.\)])\s*/);
+            if (numberedMatch) {
+                const range = new vscode.Range(i, firstCharIndex, i, firstCharIndex + numberedMatch[1].length);
+                numberedBulletDecorations.push({ range });
+                continue;
             }
 
             // Apply default bullet decoration to all other non-excluded lines
