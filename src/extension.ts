@@ -70,15 +70,28 @@ export function activate(context: vscode.ExtensionContext) {
         if (!activeEditor) {
             return;
         }
-        // Simplified decoration logic (no changes here)
-        const text = activeEditor.document.getText();
+
+        const document = activeEditor.document;
+        const foldingProvider = new IndentFoldingRangeProvider();
+        const foldingRanges = foldingProvider.provideFoldingRanges(document, {} as vscode.FoldingContext, {} as vscode.CancellationToken);
+
+        const startLines = new Set<number>();
+        if (foldingRanges) {
+            (foldingRanges as vscode.FoldingRange[]).forEach(range => {
+                startLines.add(range.start);
+            });
+        }
+
         const bulletDecorations: vscode.DecorationOptions[] = [];
-        for (let i = 0; i < activeEditor.document.lineCount; i++) {
-            const line = activeEditor.document.lineAt(i);
+        for (let i = 0; i < document.lineCount; i++) {
+            const line = document.lineAt(i);
             if (line.isEmptyOrWhitespace) continue;
             
-            const range = new vscode.Range(i, line.firstNonWhitespaceCharacterIndex, i, line.firstNonWhitespaceCharacterIndex);
-            bulletDecorations.push({ range });
+            // Only apply decoration if this line is the start of a folding range
+            if (startLines.has(i)) {
+                const range = new vscode.Range(i, line.firstNonWhitespaceCharacterIndex, i, line.firstNonWhitespaceCharacterIndex);
+                bulletDecorations.push({ range });
+            }
         }
         activeEditor.setDecorations(bulletDecorationType, bulletDecorations);
     }
