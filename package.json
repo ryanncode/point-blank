@@ -21,48 +21,23 @@
       "properties": {
         "pointblank.level1Color": {
           "type": "string",
-          "default": "#FF0000",
           "description": "Color for level 1 decorators."
         },
         "pointblank.level2Color": {
           "type": "string",
-          "default": "#00FF00",
           "description": "Color for level 2 decorators."
         },
         "pointblank.level3Color": {
           "type": "string",
-          "default": "#0000FF",
           "description": "Color for level 3 decorators."
         },
         "pointblank.level4Color": {
           "type": "string",
-          "default": "#FFFF00",
           "description": "Color for level 4 decorators."
         },
         "pointblank.level5Color": {
           "type": "string",
-          "default": "#FF00FF",
           "description": "Color for level 5 decorators."
-        },
-        "pointblank.level6Color": {
-          "type": "string",
-          "default": "#00FFFF",
-          "description": "Color for level 6 decorators."
-        },
-        "pointblank.level7Color": {
-          "type": "string",
-          "default": "#FFA500",
-          "description": "Color for level 7 decorators."
-        },
-        "pointblank.level8Color": {
-          "type": "string",
-          "default": "#800080",
-          "description": "Color for level 8 decorators."
-        },
-        "pointblank.level9Color": {
-          "type": "string",
-          "default": "#A52A2A",
-          "description": "Color for level 9 decorators."
         }
       }
     }
