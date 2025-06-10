@@ -5,6 +5,7 @@
 import * as vscode from 'vscode';
 import { IndentFoldingRangeProvider } from './foldingProvider';
 import { DecorationApplier } from './decorations/decorationApplier';
+import { initializeDecorations } from './constants';
 
 /**
  * Activates the Point Blank extension.
@@ -18,6 +19,9 @@ import { DecorationApplier } from './decorations/decorationApplier';
  * @param context The extension context provided by VS Code.
  */
 export function activate(context: vscode.ExtensionContext): void {
+    // Initialize decorations based on current configuration
+    initializeDecorations();
+
     let activeEditor = vscode.window.activeTextEditor;
     const decorationApplier = new DecorationApplier(activeEditor);
 
@@ -25,6 +29,18 @@ export function activate(context: vscode.ExtensionContext): void {
     if (activeEditor) {
         decorationApplier.updateDecorations();
     }
+
+    // Listen for configuration changes to re-initialize decorations
+    context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(event => {
+        if (event.affectsConfiguration('pointblank')) {
+            initializeDecorations();
+            // Re-apply decorations to the active editor if settings change
+            if (vscode.window.activeTextEditor) {
+                decorationApplier.setActiveEditor(vscode.window.activeTextEditor);
+                decorationApplier.updateDecorations();
+            }
+        }
+    }));
 
     // Register the IndentFoldingRangeProvider for specified languages.
     // This enables indentation-based folding in plain text, markdown, and untitled files.
