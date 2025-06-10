@@ -8,7 +8,7 @@ const bulletDecorationType = vscode.window.createTextEditorDecorationType({
     before: {
         contentText: '•',
         color: new vscode.ThemeColor('editor.foreground'),
-        margin: '0 1em 0 0',
+        margin: '0 0.5em 0 0',
     },
     rangeBehavior: vscode.DecorationRangeBehavior.ClosedOpen,
 });
@@ -24,6 +24,10 @@ const plusBulletDecorationType = vscode.window.createTextEditorDecorationType({
 
 const minusBulletDecorationType = vscode.window.createTextEditorDecorationType({
     color: new vscode.ThemeColor('editorGutter.deletedBackground'), // Subtle red
+});
+
+const numberedBulletDecorationType = vscode.window.createTextEditorDecorationType({
+    color: new vscode.ThemeColor('editorBracketHighlight.foreground3'), // A nice orange color
 });
 
 /**
@@ -117,6 +121,7 @@ export function activate(context: vscode.ExtensionContext) {
         const starBulletDecorations: vscode.DecorationOptions[] = [];
         const plusBulletDecorations: vscode.DecorationOptions[] = [];
         const minusBulletDecorations: vscode.DecorationOptions[] = [];
+        const numberedBulletDecorations: vscode.DecorationOptions[] = [];
         let inCodeBlock = false; // State to track if we are inside a fenced code block
 
         for (let i = 0; i < document.lineCount; i++) {
@@ -164,6 +169,16 @@ export function activate(context: vscode.ExtensionContext) {
                 continue;
             }
 
+            // Check for numbered lines (e.g., "1. ", "2. ", etc.)
+            if (text.match(/^\d+\.\s/)) {
+                const match = text.match(/^\d+\./);
+                if (match) {
+                    const range = new vscode.Range(i, firstCharIndex, i, firstCharIndex + match[0].length);
+                    numberedBulletDecorations.push({ range });
+                    continue;
+                }
+            }
+
             // Apply default bullet decoration to all other non-excluded lines
             const range = new vscode.Range(i, firstCharIndex, i, firstCharIndex);
             bulletDecorations.push({ range });
@@ -172,6 +187,7 @@ export function activate(context: vscode.ExtensionContext) {
         activeEditor.setDecorations(starBulletDecorationType, starBulletDecorations);
         activeEditor.setDecorations(plusBulletDecorationType, plusBulletDecorations);
         activeEditor.setDecorations(minusBulletDecorationType, minusBulletDecorations);
+        activeEditor.setDecorations(numberedBulletDecorationType, numberedBulletDecorations);
     }
 
     // Register our new FoldingRangeProvider for plain text and markdown files.
