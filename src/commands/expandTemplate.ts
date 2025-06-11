@@ -70,6 +70,6 @@ export async function expandTemplateCommand(typeName: string): Promise<void> {
     // This ensures the parser sees the *new* text and applies correct decorations.
     const documentParser = new DocumentParser();
     const decorationApplier = new DecorationApplier();
-    const parsedNodes = documentParser.parse(document);
-    decorationApplier.updateDecorations(editor, parsedNodes);
+    const { allNodes } = documentParser.parse(document);
+    decorationApplier.updateDecorationsForFullRender(editor, allNodes);
 }

@@ -54,8 +54,8 @@ export function activate(context: vscode.ExtensionContext): void {
 
     // Initial update of decorations if an editor is already active.
     if (extensionState.activeEditor) {
-        const parsedNodes = documentParser.parse(extensionState.activeEditor.document); // Initial full parse
-        decorationApplier.updateDecorations(extensionState.activeEditor, parsedNodes);
+        const { allNodes } = documentParser.parse(extensionState.activeEditor.document); // Initial full parse
+        decorationApplier.updateDecorationsForFullRender(extensionState.activeEditor, allNodes);
     }
 
     // Listen for configuration changes to re-initialize decorations
@@ -64,8 +64,8 @@ export function activate(context: vscode.ExtensionContext): void {
             configuration.initializeDecorationTypes();
             // Re-apply decorations to the active editor if settings change
             if (extensionState.activeEditor) {
-                const parsedNodes = documentParser.parse(extensionState.activeEditor.document); // Full parse on config change
-                decorationApplier.updateDecorations(extensionState.activeEditor, parsedNodes);
+                const { allNodes } = documentParser.parse(extensionState.activeEditor.document); // Full parse on config change
+                decorationApplier.updateDecorationsForFullRender(extensionState.activeEditor, allNodes);
             }
         }
     }));
@@ -85,42 +85,31 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.window.onDidChangeActiveTextEditor(editor => {
         extensionState.setActiveEditor(editor);
         if (extensionState.activeEditor) {
-            const parsedNodes = documentParser.parse(extensionState.activeEditor.document); // Full parse on active editor change
-            decorationApplier.updateDecorations(extensionState.activeEditor, parsedNodes);
+            const { allNodes } = documentParser.parse(extensionState.activeEditor.document); // Full parse on active editor change
+            decorationApplier.updateDecorationsForFullRender(extensionState.activeEditor, allNodes);
         }
     }, null, context.subscriptions);
 
     // Debounced update for full document parsing and decoration
-    const debouncedFullUpdate = debounce((event?: vscode.TextDocumentChangeEvent) => {
+    const debouncedIncrementalUpdate = debounce((event: vscode.TextDocumentChangeEvent) => {
         if (extensionState.activeEditor) {
-            const parsedNodes = documentParser.parse(extensionState.activeEditor.document, event);
-            decorationApplier.updateDecorations(extensionState.activeEditor, parsedNodes);
+            const result = documentParser.parse(extensionState.activeEditor.document, event);
+            decorationApplier.updateDecorationsForNodes(extensionState.activeEditor, result.changedNodes);
         }
     }, configuration.getDebounceDelay());
 
     // Fast debounced update for visible range changes (scrolling)
     const debouncedVisibleRangeUpdate = debounce(() => {
         if (extensionState.activeEditor) {
-            const parsedNodes = documentParser.parse(extensionState.activeEditor.document);
-            decorationApplier.updateDecorations(extensionState.activeEditor, parsedNodes);
+            const { allNodes } = documentParser.parse(extensionState.activeEditor.document);
+            decorationApplier.updateDecorationsForFullRender(extensionState.activeEditor, allNodes);
         }
     }, 20);
 
     // Listen for text document changes
     vscode.workspace.onDidChangeTextDocument(event => {
         if (extensionState.activeEditor && event.document === extensionState.activeEditor.document) {
-            // Immediate update for the changed lines
-            const changedLines = event.contentChanges.map(c => c.range.start.line);
-            const uniqueChangedLines = [...new Set(changedLines)];
-            const parsedLines = documentParser.parse(event.document, event);
-            const lineNodes = parsedLines.filter(node => uniqueChangedLines.includes(node.lineNumber));
-
-            if (lineNodes.length > 0) {
-                decorationApplier.updateLineDecorations(extensionState.activeEditor, lineNodes);
-            }
-
-            // Trigger the full debounced update
-            debouncedFullUpdate(event);
+            debouncedIncrementalUpdate(event);
 
             const change = event.contentChanges[0];
             if (change && change.text === ' ' && change.rangeLength === 0) {

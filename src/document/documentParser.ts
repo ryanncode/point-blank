@@ -6,20 +6,17 @@ export class DocumentParser {
     private _cachedNodes: DocumentNode[] = [];
     private _inCodeBlock: boolean = false; // Track code block state across incremental updates
 
-    public parse(document: vscode.TextDocument, event?: vscode.TextDocumentChangeEvent): DocumentNode[] {
+    public parse(document: vscode.TextDocument, event?: vscode.TextDocumentChangeEvent): { allNodes: DocumentNode[], changedNodes: DocumentNode[] } {
         if (!event || this._cachedNodes.length === 0) {
-            // Full parse if no event or cache is empty
-            return this.fullParse(document);
+            const allNodes = this.fullParse(document);
+            return { allNodes, changedNodes: allNodes };
         }
 
-        // Incremental parse
-        let nodes = [...this._cachedNodes]; // Start with a copy of current nodes
+        const changedNodes: DocumentNode[] = [];
+        let nodes = [...this._cachedNodes];
         let currentParentLineNumber: number | undefined = undefined;
-        this._inCodeBlock = false; // Reset for full re-evaluation of code blocks
+        this._inCodeBlock = false;
 
-        // Re-evaluate parent line numbers and code block state from the beginning
-        // This is a simplification; a true incremental parse would be more complex
-        // and track parentage more robustly. For now, re-parsing affected sections.
         for (let i = 0; i < document.lineCount; i++) {
             const line = document.lineAt(i);
             const trimmedText = line.text.trim();
@@ -29,7 +26,6 @@ export class DocumentParser {
             if (!line.isEmptyOrWhitespace && !this._inCodeBlock && !isExcludedLine(line)) {
                 currentParentLineNumber = i;
             }
-            // Update parentLineNumber for existing nodes if needed
             if (nodes[i]) {
                 nodes[i].parentLineNumber = currentParentLineNumber;
             }
@@ -41,31 +37,28 @@ export class DocumentParser {
             const linesDeleted = endLine - startLine + 1;
             const newLinesCount = change.text.split('\n').length;
 
-            // Remove affected lines
-            nodes.splice(startLine, linesDeleted);
+            const deletedNodes = nodes.splice(startLine, linesDeleted);
+            changedNodes.push(...deletedNodes);
 
-            // Parse and insert new lines
             const newNodes: DocumentNode[] = [];
             for (let i = 0; i < newLinesCount; i++) {
                 const lineIndex = startLine + i;
                 const line = document.lineAt(lineIndex);
-                newNodes.push(this.parseLine(line, lineIndex));
+                const newNode = this.parseLine(line, lineIndex);
+                newNodes.push(newNode);
             }
             nodes.splice(startLine, 0, ...newNodes);
+            changedNodes.push(...newNodes);
         }
 
-        // Re-calculate parent line numbers and code block state for the entire document
-        // after changes, as incremental updates can shift context.
-        // This is a temporary measure for simplicity; a more robust solution
-        // would involve a tree-like structure that can be patched.
         this._inCodeBlock = false;
         currentParentLineNumber = undefined;
         for (let i = 0; i < nodes.length; i++) {
             const node = nodes[i];
-            const line = document.lineAt(i); // Get the actual line from the document
+            const line = document.lineAt(i);
             const trimmedText = line.text.trim();
 
-            node.lineNumber = i; // Ensure line numbers are correct after splice/insert
+            node.lineNumber = i;
             node.line = line;
             node.text = line.text;
             node.trimmedText = trimmedText;
@@ -80,7 +73,6 @@ export class DocumentParser {
 
             node.isExcluded = isExcludedLine(line);
 
-            // Re-evaluate Key:: Value pattern
             const lineTextFromNonWhitespace = line.text.substring(node.indent);
             const keyValueMatch = lineTextFromNonWhitespace.match(/^(\S+::)\s*(.*)/);
             if (keyValueMatch) {
@@ -100,7 +92,6 @@ export class DocumentParser {
                 node.keyValue = undefined;
             }
 
-            // Re-evaluate Typed Node pattern: - (TypeName)
             const typedNodeMatch = lineTextFromNonWhitespace.match(/^\s*\((.+)\)/);
             if (typedNodeMatch) {
                 node.isTypedNode = true;
@@ -122,7 +113,7 @@ export class DocumentParser {
         }
 
         this._cachedNodes = nodes;
-        return this._cachedNodes;
+        return { allNodes: this._cachedNodes, changedNodes: changedNodes };
     }
 
     private fullParse(document: vscode.TextDocument): DocumentNode[] {

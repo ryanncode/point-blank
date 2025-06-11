@@ -36,7 +36,7 @@ export class DecorationApplier {
      * @param activeEditor The currently active text editor.
      * @param parsedNodes An array of all `DocumentNode` objects for the document.
      */
-    public updateDecorations(activeEditor: vscode.TextEditor | undefined, parsedNodes: DocumentNode[]): void {
+    public updateDecorationsForFullRender(activeEditor: vscode.TextEditor | undefined, parsedNodes: DocumentNode[]): void {
         if (!activeEditor) {
             return;
         }
@@ -62,11 +62,11 @@ export class DecorationApplier {
      * @param activeEditor The currently active text editor.
      * @param nodesToUpdate An array of `DocumentNode` objects for the lines to be updated.
      */
-    public updateLineDecorations(activeEditor: vscode.TextEditor | undefined, nodesToUpdate: DocumentNode[]): void {
+    public updateDecorationsForNodes(activeEditor: vscode.TextEditor | undefined, nodesToUpdate: DocumentNode[]): void {
         if (!activeEditor) {
             return;
         }
-        
+
         // Remove old decorations for the lines being updated
         const linesToUpdate = nodesToUpdate.map(n => n.lineNumber);
         for (const type of this._decorations.keys()) {
