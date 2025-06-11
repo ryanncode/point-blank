@@ -6,6 +6,7 @@ import * as vscode from 'vscode';
 import { IndentFoldingRangeProvider } from './foldingProvider';
 import { DecorationApplier } from './decorations/decorationApplier';
 import { initializeDecorations } from './constants';
+import { debounce } from './utils/debounce';
 
 /**
  * Activates the Point Blank extension.
@@ -65,9 +66,18 @@ export function activate(context: vscode.ExtensionContext): void {
     // Listen for changes in the text document.
     // If the change occurs in the currently active editor's document,
     // trigger a decoration update to reflect the latest content.
+    // Listen for changes in the text document.
+    // If the change occurs in the currently active editor's document,
+    // trigger a decoration update to reflect the latest content.
+    const debouncedUpdateDecorations = debounce(() => {
+        if (activeEditor) {
+            decorationApplier.updateDecorations();
+        }
+    }, 25); // Debounce time of 25ms
+
     vscode.workspace.onDidChangeTextDocument(event => {
         if (activeEditor && event.document === activeEditor.document) {
-            decorationApplier.updateDecorations();
+            debouncedUpdateDecorations();
         }
     }, null, context.subscriptions);
 }
