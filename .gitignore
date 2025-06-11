@@ -22,9 +22,9 @@ yarn-error.log*
 .vscode/
 .DS_Store
 Thumbs.db
-README-default.md
-vsc-extension-quickstart.md
-notes/
 
 # Logs
 *.log
+
+# User
+notes/

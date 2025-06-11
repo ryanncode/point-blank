@@ -11,6 +11,8 @@ import { Configuration } from './config/configuration';
 import { focusModeCommand } from './commands/focusMode';
 import { unfocusModeCommand } from './commands/unfocusMode';
 import { handleEnterKeyCommand } from './commands/handleEnterKey';
+import { DocumentParser } from './document/documentParser'; // New import
+import { DocumentNode } from './document/documentNode'; // New import
 
 /**
  * Activates the Point Blank extension.
@@ -27,6 +29,7 @@ export function activate(context: vscode.ExtensionContext): void {
     const extensionState = ExtensionState.getInstance();
     const configuration = Configuration.getInstance();
     const decorationApplier = new DecorationApplier();
+    const documentParser = new DocumentParser(); // New instance
 
     // Initialize decorations based on current configuration
     configuration.initializeDecorationTypes();
@@ -45,7 +48,8 @@ export function activate(context: vscode.ExtensionContext): void {
 
     // Initial update of decorations if an editor is already active.
     if (extensionState.activeEditor) {
-        decorationApplier.updateDecorations(extensionState.activeEditor);
+        const parsedNodes = documentParser.parse(extensionState.activeEditor.document);
+        decorationApplier.updateDecorations(extensionState.activeEditor, parsedNodes);
     }
 
     // Listen for configuration changes to re-initialize decorations
@@ -54,7 +58,8 @@ export function activate(context: vscode.ExtensionContext): void {
             configuration.initializeDecorationTypes();
             // Re-apply decorations to the active editor if settings change
             if (extensionState.activeEditor) {
-                decorationApplier.updateDecorations(extensionState.activeEditor);
+                const parsedNodes = documentParser.parse(extensionState.activeEditor.document);
+                decorationApplier.updateDecorations(extensionState.activeEditor, parsedNodes);
             }
         }
     }));
@@ -74,7 +79,8 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.window.onDidChangeActiveTextEditor(editor => {
         extensionState.setActiveEditor(editor);
         if (extensionState.activeEditor) {
-            decorationApplier.updateDecorations(extensionState.activeEditor);
+            const parsedNodes = documentParser.parse(extensionState.activeEditor.document);
+            decorationApplier.updateDecorations(extensionState.activeEditor, parsedNodes);
         }
     }, null, context.subscriptions);
 
@@ -83,7 +89,8 @@ export function activate(context: vscode.ExtensionContext): void {
     // trigger a decoration update to reflect the latest content.
     const debouncedUpdateDecorations = debounce(() => {
         if (extensionState.activeEditor) {
-            decorationApplier.updateDecorations(extensionState.activeEditor);
+            const parsedNodes = documentParser.parse(extensionState.activeEditor.document); // Parse document
+            decorationApplier.updateDecorations(extensionState.activeEditor, parsedNodes); // Pass parsed nodes
         }
     }, 30); // Debounce time of 30ms
 
