@@ -28,7 +28,6 @@ export class FoldingUtils {
      * @returns The most relevant FoldingRange, or undefined if none is found.
      */
     public static findNearestFoldingBlock(
-        document: vscode.TextDocument,
         line: number,
         allRanges: vscode.FoldingRange[]
     ): vscode.FoldingRange | undefined {

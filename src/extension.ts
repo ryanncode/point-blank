@@ -36,7 +36,7 @@ export function activate(context: vscode.ExtensionContext): void {
         const currentLine = editor.selection.active.line;
 
         const allFoldingRanges = await FoldingUtils.getAllFoldingRanges(document);
-        const targetRange = FoldingUtils.findNearestFoldingBlock(document, currentLine, allFoldingRanges);
+        const targetRange = FoldingUtils.findNearestFoldingBlock(currentLine, allFoldingRanges);
 
         if (targetRange) {
             // First, unfold everything to ensure a clean state.
