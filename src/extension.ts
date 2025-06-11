@@ -3,11 +3,13 @@
 // and orchestrates the registration of providers and event listeners.
 
 import * as vscode from 'vscode';
-import { IndentFoldingRangeProvider } from './foldingProvider';
+import { IndentFoldingRangeProvider } from './providers/indentFoldingProvider';
 import { DecorationApplier } from './decorations/decorationApplier';
-import { initializeDecorations } from './constants';
 import { debounce } from './utils/debounce';
-import { FoldingUtils } from './utils/foldingUtils';
+import { ExtensionState } from './state/extensionState';
+import { Configuration } from './config/configuration';
+import { focusModeCommand } from './commands/focusMode';
+import { unfocusModeCommand } from './commands/unfocusMode';
 
 /**
  * Activates the Point Blank extension.
@@ -21,64 +23,34 @@ import { FoldingUtils } from './utils/foldingUtils';
  * @param context The extension context provided by VS Code.
  */
 export function activate(context: vscode.ExtensionContext): void {
+    const extensionState = ExtensionState.getInstance();
+    const configuration = Configuration.getInstance();
+    const decorationApplier = new DecorationApplier();
+
     // Initialize decorations based on current configuration
-    initializeDecorations();
+    configuration.initializeDecorationTypes();
+
+    // Set initial active editor
+    extensionState.setActiveEditor(vscode.window.activeTextEditor);
 
     // Register Focus Mode (Hoisting) command
-    context.subscriptions.push(vscode.commands.registerCommand('pointblank.focusMode', async () => {
-        const editor = vscode.window.activeTextEditor;
-        if (!editor) {
-            vscode.window.showInformationMessage('No active editor found.');
-            return;
-        }
-
-        const document = editor.document;
-        const currentLine = editor.selection.active.line;
-
-        const allFoldingRanges = await FoldingUtils.getAllFoldingRanges(document);
-        const targetRange = FoldingUtils.findNearestFoldingBlock(currentLine, allFoldingRanges);
-
-        if (targetRange) {
-            // First, unfold everything to ensure a clean state.
-            await vscode.commands.executeCommand('editor.unfoldAll');
-
-            // Then, fold all ranges that are not part of the target's lineage (not ancestors or descendants).
-            // This leaves a clear "path" to the focused block.
-            for (const range of allFoldingRanges) {
-                const isAncestor = range.start <= targetRange.start && range.end >= targetRange.end;
-                const isDescendant = range.start >= targetRange.start && range.end <= targetRange.end;
-
-                // We only want to fold ranges that are not in the direct line of the target.
-                if (!isAncestor && !isDescendant) {
-                    await vscode.commands.executeCommand('editor.fold', { selectionLines: [range.start] });
-                }
-            }
-        } else {
-            vscode.window.showInformationMessage('No folding block found at the current line.');
-        }
-    }));
+    context.subscriptions.push(vscode.commands.registerCommand('pointblank.focusMode', () => focusModeCommand(extensionState)));
 
     // Register Unfocus command
-    context.subscriptions.push(vscode.commands.registerCommand('pointblank.unfocusMode', async () => {
-        await vscode.commands.executeCommand('editor.unfoldAll');
-    }));
-
-    let activeEditor = vscode.window.activeTextEditor;
-    const decorationApplier = new DecorationApplier(activeEditor);
+    context.subscriptions.push(vscode.commands.registerCommand('pointblank.unfocusMode', unfocusModeCommand));
 
     // Initial update of decorations if an editor is already active.
-    if (activeEditor) {
-        decorationApplier.updateDecorations();
+    if (extensionState.activeEditor) {
+        decorationApplier.updateDecorations(extensionState.activeEditor);
     }
 
     // Listen for configuration changes to re-initialize decorations
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(event => {
         if (event.affectsConfiguration('pointblank')) {
-            initializeDecorations();
+            configuration.initializeDecorationTypes();
             // Re-apply decorations to the active editor if settings change
-            if (vscode.window.activeTextEditor) {
-                decorationApplier.setActiveEditor(vscode.window.activeTextEditor);
-                decorationApplier.updateDecorations();
+            if (extensionState.activeEditor) {
+                decorationApplier.updateDecorations(extensionState.activeEditor);
             }
         }
     }));
@@ -96,34 +68,30 @@ export function activate(context: vscode.ExtensionContext): void {
     // When the active editor changes, update the decoration applier's editor
     // and trigger a decoration update for the new editor.
     vscode.window.onDidChangeActiveTextEditor(editor => {
-        activeEditor = editor;
-        decorationApplier.setActiveEditor(activeEditor);
-        if (activeEditor) {
-            decorationApplier.updateDecorations();
+        extensionState.setActiveEditor(editor);
+        if (extensionState.activeEditor) {
+            decorationApplier.updateDecorations(extensionState.activeEditor);
         }
     }, null, context.subscriptions);
 
-    // Listen for changes in the text document.
-    // If the change occurs in the currently active editor's document,
-    // trigger a decoration update to reflect the latest content.
     // Listen for changes in the text document.
     // If the change occurs in the currently active editor's document,
     // trigger a decoration update to reflect the latest content.
     const debouncedUpdateDecorations = debounce(() => {
-        if (activeEditor) {
-            decorationApplier.updateDecorations();
+        if (extensionState.activeEditor) {
+            decorationApplier.updateDecorations(extensionState.activeEditor);
         }
     }, 30); // Debounce time of 30ms
 
     vscode.workspace.onDidChangeTextDocument(event => {
-        if (activeEditor && event.document === activeEditor.document) {
+        if (extensionState.activeEditor && event.document === extensionState.activeEditor.document) {
             debouncedUpdateDecorations();
         }
     }, null, context.subscriptions);
 
-    // NEW: Debounced update for visible range changes (scrolling)
+    // Debounced update for visible range changes (scrolling)
     vscode.window.onDidChangeTextEditorVisibleRanges(event => {
-        if (activeEditor && event.textEditor === activeEditor) {
+        if (extensionState.activeEditor && event.textEditor === extensionState.activeEditor) {
             debouncedUpdateDecorations();
         }
     }, null, context.subscriptions);
@@ -132,10 +100,9 @@ export function activate(context: vscode.ExtensionContext): void {
 /**
  * Deactivates the Point Blank extension.
  * This function is called when the extension is deactivated.
- * Currently, no specific cleanup is required beyond what VS Code handles automatically
- * by disposing of subscriptions.
+ * It disposes of all active decoration types to prevent memory leaks.
  */
 export function deactivate(): void {
-    // No explicit cleanup needed as subscriptions are handled by context.subscriptions.
+    ExtensionState.getInstance().disposeDecorationTypes();
 }
 

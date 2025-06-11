@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { IndentFoldingRangeProvider } from '../foldingProvider';
+import { IndentFoldingRangeProvider } from '../providers/indentFoldingProvider';
 
 /**
  * Provides utility functions related to folding ranges.

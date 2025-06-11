@@ -1,13 +1,6 @@
 import * as vscode from 'vscode';
-import {
-    bulletDecorationType,
-    starBulletDecorationType,
-    plusBulletDecorationType,
-    minusBulletDecorationType,
-    numberedBulletDecorationType,
-    blockquoteDecorationType
-} from '../constants';
-import { isExcludedLine } from '../utils/lineFilters';
+import { ExtensionState } from '../state/extensionState';
+import { isExcludedLine } from './lineFilters';
 
 /**
  * Manages and applies text editor decorations for bullet points and other outline elements.
@@ -15,35 +8,24 @@ import { isExcludedLine } from '../utils/lineFilters';
  * visual styles based on content and formatting.
  */
 export class DecorationApplier {
-    private activeEditor: vscode.TextEditor | undefined;
+    private _extensionState: ExtensionState;
 
-    /**
-     * Creates an instance of DecorationApplier.
-     * @param editor The active text editor to which decorations will be applied.
-     */
-    constructor(editor: vscode.TextEditor | undefined) {
-        this.activeEditor = editor;
-    }
-
-    /**
-     * Sets the active text editor for the decoration applier.
-     * @param editor The new active text editor.
-     */
-    public setActiveEditor(editor: vscode.TextEditor | undefined): void {
-        this.activeEditor = editor;
+    constructor() {
+        this._extensionState = ExtensionState.getInstance();
     }
 
     /**
      * Updates the decorations in the active text editor.
      * This method iterates through each line of the document, determines the appropriate
      * decoration based on content (e.g., bullet type, headers, code blocks), and applies them.
+     * @param activeEditor The currently active text editor.
      */
-    public updateDecorations(): void {
-        if (!this.activeEditor) {
+    public updateDecorations(activeEditor: vscode.TextEditor | undefined): void {
+        if (!activeEditor) {
             return;
         }
 
-        const document = this.activeEditor.document;
+        const document = activeEditor.document;
 
         // Initialize arrays to hold decoration options for each type.
         const bulletDecorations: vscode.DecorationOptions[] = [];
@@ -56,7 +38,7 @@ export class DecorationApplier {
         let inCodeBlock = false; // State to track if we are inside a fenced code block (e.g., ```)
 
         // Iterate only over visible ranges to avoid applying decorations to folded lines.
-        for (const visibleRange of this.activeEditor.visibleRanges) {
+        for (const visibleRange of activeEditor.visibleRanges) {
             for (let i = visibleRange.start.line; i <= visibleRange.end.line; i++) {
                 const line = document.lineAt(i);
                 const text = line.text.trim();
@@ -129,11 +111,11 @@ export class DecorationApplier {
         }
 
         // Apply all collected decorations to the active editor.
-        this.activeEditor.setDecorations(bulletDecorationType, bulletDecorations);
-        this.activeEditor.setDecorations(starBulletDecorationType, starBulletDecorations);
-        this.activeEditor.setDecorations(plusBulletDecorationType, plusBulletDecorations);
-        this.activeEditor.setDecorations(minusBulletDecorationType, minusBulletDecorations);
-        this.activeEditor.setDecorations(numberedBulletDecorationType, numberedBulletDecorations);
-        this.activeEditor.setDecorations(blockquoteDecorationType, blockquoteDecorations);
+        activeEditor.setDecorations(this._extensionState.getDecorationType('bulletDecorationType')!, bulletDecorations);
+        activeEditor.setDecorations(this._extensionState.getDecorationType('starBulletDecorationType')!, starBulletDecorations);
+        activeEditor.setDecorations(this._extensionState.getDecorationType('plusBulletDecorationType')!, plusBulletDecorations);
+        activeEditor.setDecorations(this._extensionState.getDecorationType('minusBulletDecorationType')!, minusBulletDecorations);
+        activeEditor.setDecorations(this._extensionState.getDecorationType('numberedBulletDecorationType')!, numberedBulletDecorations);
+        activeEditor.setDecorations(this._extensionState.getDecorationType('blockquoteDecorationType')!, blockquoteDecorations);
     }
 }
