@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { DocumentNode } from '../document/documentNode';
+import { BlockNode } from '../document/blockNode';
 
 /**
  * Calculates decoration options for a given set of document nodes.
@@ -12,7 +12,7 @@ export class DecorationCalculator {
      * @param nodes The document nodes to process.
      * @param decorationsMap The map to populate with calculated decorations.
      */
-    public static calculateDecorations(nodes: DocumentNode[], decorationsMap: Map<string, vscode.DecorationOptions[]>): void {
+    public static calculateDecorations(nodes: BlockNode[], decorationsMap: Map<string, vscode.DecorationOptions[]>): void {
         for (const node of nodes) {
             if (node.isCodeBlockDelimiter || node.isExcluded || node.line.isEmptyOrWhitespace) {
                 continue;
@@ -61,7 +61,7 @@ export class DecorationCalculator {
             }
 
             // Default bullet point for any line that is not otherwise decorated
-            const range = new vscode.Range(node.lineNumber, firstCharIndex, node.lineNumber, firstCharIndex);
+            const range = new vscode.Range(node.lineNumber, firstCharIndex, node.lineNumber, firstCharIndex + 1);
             decorationsMap.get('bulletDecorationType')!.push({ range });
         }
     }

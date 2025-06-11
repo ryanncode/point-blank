@@ -1,28 +1,29 @@
 import * as vscode from 'vscode';
-import { DocumentNode } from '../document/documentNode';
+import { BlockNode } from '../document/blockNode'; // Use BlockNode
+import { DocumentTree } from '../document/documentTree'; // Import DocumentTree
 import { DecorationCalculator } from './decorationCalculator';
 import { ExtensionState } from '../state/extensionState';
 import { debounce } from '../utils/debounce';
 
 /**
- * Manages and applies text editor decorations based on document changes,
- * visible range changes, and selection changes. It orchestrates the
- * decoration updates with different debounce timings.
+ * Manages and applies text editor decorations based on document changes.
+ * It orchestrates the decoration updates in a flicker-free manner.
  */
 export class DecorationManager {
     private _extensionState: ExtensionState;
     private _decorationTypes: Map<string, vscode.TextEditorDecorationType> = new Map();
     private _activeEditor: vscode.TextEditor | undefined;
     private _disposables: vscode.Disposable[] = [];
-    private _currentDecorations: Map<string, vscode.DecorationOptions[]> = new Map(); // Stores the currently applied decorations
+    // Stores the currently applied decorations, categorized by type
+    private _currentDecorations: Map<string, vscode.DecorationOptions[]> = new Map();
 
-    private _debouncedUpdateVisibleRange: (editor: vscode.TextEditor) => void;
-    private _debouncedUpdateFullDocument: (editor: vscode.TextEditor) => void;
+    // Debounced function for general decoration updates
+    private _debouncedUpdateDecorations: (editor: vscode.TextEditor, tree: DocumentTree, changedRange: vscode.Range) => void;
 
     constructor() {
         this._extensionState = ExtensionState.getInstance();
-        this._debouncedUpdateVisibleRange = debounce(this.updateVisibleRangeDecorations.bind(this), 20);
-        this._debouncedUpdateFullDocument = debounce(this.updateFullDocumentDecorations.bind(this), 150);
+        // Single debounced update function for all decoration changes
+        this._debouncedUpdateDecorations = debounce(this.applyDecorationsInternal.bind(this), 50);
     }
 
     /**
@@ -34,9 +35,7 @@ export class DecorationManager {
 
         // Listen for active editor changes
         vscode.window.onDidChangeActiveTextEditor(this.onDidChangeActiveTextEditor, this, this._disposables);
-        // Listen for visible range changes (scrolling)
-        vscode.window.onDidChangeTextEditorVisibleRanges(this.onDidChangeTextEditorVisibleRanges, this, this._disposables);
-        // Listen for selection changes (for immediate current line update)
+        // Listen for selection changes (for cursor positioning)
         vscode.window.onDidChangeTextEditorSelection(this.onDidChangeTextEditorSelection, this, this._disposables);
 
         // Set initial active editor
@@ -70,175 +69,89 @@ export class DecorationManager {
         }
         this._activeEditor = editor;
         if (editor) {
-            // Immediately trigger a full update for the new active editor
-            this.triggerFullUpdateImmediate(editor);
+            // When active editor changes, trigger a full re-render
+            const documentModel = this._extensionState.getDocumentModel(editor.document.uri.toString());
+            if (documentModel) {
+                this.updateDecorations(documentModel.documentTree, new vscode.Range(0, 0, editor.document.lineCount, 0));
+            }
         }
     }
 
     /**
-     * Notifies the DecorationManager that the document nodes have changed.
-     * This triggers a debounced full document decoration update.
+     * Main entry point for updating decorations. This method should be called
+     * by DocumentModel whenever the document tree changes.
+     * It uses a debounced mechanism to prevent excessive updates.
+     * @param tree The current `DocumentTree`.
+     * @param changedRange The range of lines that have changed in the document.
      */
-    public notifyDocumentNodesChanged(editor: vscode.TextEditor): void {
-        this._debouncedUpdateFullDocument(editor);
-    }
-
-    /**
-     * Triggers an immediate full document decoration update.
-     * Used when a document is opened or becomes active to ensure immediate display.
-     */
-    public triggerFullUpdateImmediate(editor: vscode.TextEditor): void {
-        const documentModel = this._extensionState.getDocumentModel(editor.document.uri.toString());
-        if (!documentModel) {
+    public updateDecorations(tree: DocumentTree, changedRange: vscode.Range): void {
+        if (!this._activeEditor || this._activeEditor.document.uri.toString() !== tree.document.uri.toString()) {
             return;
         }
-        // Calculate and apply decorations for all nodes immediately
-        this._updateAndApplyDecorations(editor, documentModel.nodes);
+        this._debouncedUpdateDecorations(this._activeEditor, tree, changedRange);
     }
 
     private onDidChangeActiveTextEditor(editor: vscode.TextEditor | undefined): void {
         this.setActiveEditor(editor);
     }
 
-    private onDidChangeTextEditorVisibleRanges(event: vscode.TextEditorVisibleRangesChangeEvent): void {
-        if (this._activeEditor && event.textEditor === this._activeEditor) {
-            this._debouncedUpdateVisibleRange(this._activeEditor);
-        }
-    }
+    // Removed onDidChangeTextEditorVisibleRanges as it's now handled by the unified updateDecorations
+    // and the debounced nature of applyDecorationsInternal.
 
     private onDidChangeTextEditorSelection(event: vscode.TextEditorSelectionChangeEvent): void {
         if (this._activeEditor && event.textEditor === this._activeEditor) {
-            // Immediately update decorations for the current line(s)
-            this.updateCurrentLineDecorations(this._activeEditor, event.selections);
-        }
-    }
+            // Handle cursor positioning to prevent typing before bullet points
+            const editor = event.textEditor;
+            const document = editor.document;
+            const selection = editor.selection;
 
-    /**
-     * Immediately updates decorations for the current line(s) based on selection.
-     * This is crucial for immediate feedback during typing.
-     */
-    private updateCurrentLineDecorations(editor: vscode.TextEditor, selections: readonly vscode.Selection[]): void {
-        const documentModel = this._extensionState.getDocumentModel(editor.document.uri.toString());
-        if (!documentModel) {
-            return;
-        }
+            if (selection.isEmpty) { // Only act if there's a single cursor
+                const currentLine = document.lineAt(selection.active.line);
+                const firstCharIndex = currentLine.firstNonWhitespaceCharacterIndex;
 
-        const affectedLineNumbers = new Set<number>();
-        selections.forEach(selection => {
-            affectedLineNumbers.add(selection.active.line);
-            // Also consider the line where the selection started if it's a range
-            if (!selection.isEmpty) {
-                affectedLineNumbers.add(selection.start.line);
-                affectedLineNumbers.add(selection.end.line);
-            }
-        });
+                // Check if the current line has a bullet point (simple check for common bullet types)
+                const hasBullet = currentLine.text.substring(firstCharIndex, firstCharIndex + 2).match(/^(\*|\-|\+|\d+\.|\d+\))\s/);
 
-        const nodesToProcess: DocumentNode[] = [];
-        documentModel.nodes.forEach(node => {
-            if (affectedLineNumbers.has(node.lineNumber)) {
-                nodesToProcess.push(node);
-            }
-        });
-
-        const decorationsToApply = new Map<string, vscode.DecorationOptions[]>();
-        for (const typeName of this._decorationTypes.keys()) {
-            if (!decorationsToApply.has(typeName)) {
-                decorationsToApply.set(typeName, []);
-            }
-        }
-
-        DecorationCalculator.calculateDecorations(nodesToProcess, decorationsToApply);
-
-        // Apply only the decorations for the current line(s)
-        this._updateAndApplyDecorations(editor, nodesToProcess);
-    }
-
-    /**
-     * Updates decorations for the currently visible range of the editor.
-     * This is debounced to optimize for scrolling.
-     */
-    private updateVisibleRangeDecorations(editor: vscode.TextEditor): void {
-        const documentModel = this._extensionState.getDocumentModel(editor.document.uri.toString());
-        if (!documentModel) {
-            return;
-        }
-
-        const visibleRanges = editor.visibleRanges;
-        const bufferLines = 20; // Extend visible range by a few lines for smoother scrolling
-
-        const nodesToProcess: DocumentNode[] = [];
-        documentModel.nodes.forEach(node => {
-            const isVisible = visibleRanges.some(range =>
-                range.start.line <= node.lineNumber && node.lineNumber <= range.end.line + bufferLines
-            );
-            if (isVisible) {
-                nodesToProcess.push(node);
-            }
-        });
-
-        this._updateAndApplyDecorations(editor, nodesToProcess);
-    }
-
-    /**
-     * Updates all decorations for the entire document.
-     * This is debounced for overall document changes (typing, pasting).
-     */
-    private updateFullDocumentDecorations(editor: vscode.TextEditor): void {
-        const documentModel = this._extensionState.getDocumentModel(editor.document.uri.toString());
-        if (!documentModel) {
-            return;
-        }
-        // For a full document update, process all nodes
-        this._updateAndApplyDecorations(editor, documentModel.nodes);
-    }
-
-    /**
-     * Calculates decorations for a given set of nodes and applies them to the editor.
-     * This method clears all existing decorations of managed types before applying new ones.
-     */
-    /**
-     * Centralized method to calculate, update internal state, and apply decorations.
-     * This ensures all decoration updates go through a single, state-aware path.
-     */
-    private _updateAndApplyDecorations(editor: vscode.TextEditor, nodesToProcess: DocumentNode[]): void {
-        const newDecorationsForProcessedNodes = new Map<string, vscode.DecorationOptions[]>();
-        for (const typeName of this._decorationTypes.keys()) {
-            newDecorationsForProcessedNodes.set(typeName, []);
-        }
-
-        DecorationCalculator.calculateDecorations(nodesToProcess, newDecorationsForProcessedNodes);
-
-        const affectedLineNumbers = new Set(nodesToProcess.map(node => node.lineNumber));
-
-        for (const [typeName, decorationType] of this._decorationTypes.entries()) {
-            const existingOptions = this._currentDecorations.get(typeName) || [];
-            const updatedOptions: vscode.DecorationOptions[] = [];
-
-            // Add existing decorations that are NOT on affected lines
-            existingOptions.forEach(opt => {
-                if (!affectedLineNumbers.has(opt.range.start.line)) {
-                    updatedOptions.push(opt);
+                if (hasBullet) {
+                    const bulletEndPosition = firstCharIndex + hasBullet[0].length;
+                    // If cursor is before the end of the bullet point, move it after
+                    if (selection.active.character < bulletEndPosition) {
+                        const newPosition = new vscode.Position(selection.active.line, bulletEndPosition);
+                        editor.selection = new vscode.Selection(newPosition, newPosition);
+                    }
                 }
-            });
-
-            // Add new decorations for affected lines
-            const newOptionsForType = newDecorationsForProcessedNodes.get(typeName) || [];
-            updatedOptions.push(...newOptionsForType);
-
-            this._currentDecorations.set(typeName, updatedOptions);
+            }
         }
-
-        this.applyAllCurrentDecorations(editor);
     }
 
     /**
-     * Applies all decorations currently stored in `_currentDecorations` to the editor.
-     * This is the single point where `editor.setDecorations` is called.
+     * Internal method to calculate and apply decorations. This is the core
+     * logic that gets debounced.
+     * @param editor The active text editor.
+     * @param tree The current `DocumentTree`.
+     * @param changedRange The range of lines that have changed.
      */
-    private applyAllCurrentDecorations(editor: vscode.TextEditor): void {
+    private applyDecorationsInternal(editor: vscode.TextEditor, tree: DocumentTree, changedRange: vscode.Range): void {
+        if (!editor) {
+            return;
+        }
+
+        // Always recalculate and apply decorations for the entire document.
+        // VS Code is optimized to diff and render changes efficiently, preventing flicker.
+        const allNodes = tree.getAllNodesFlat();
+        const newCalculatedDecorations = new Map<string, vscode.DecorationOptions[]>();
+
+        for (const key of this._decorationTypes.keys()) {
+            newCalculatedDecorations.set(key, []);
+        }
+
+        DecorationCalculator.calculateDecorations(allNodes, newCalculatedDecorations);
+
+        // Apply all decorations for each type. This replaces any previously set decorations.
         for (const [typeName, decorationType] of this._decorationTypes.entries()) {
-            const options = this._currentDecorations.get(typeName) || [];
+            const options = newCalculatedDecorations.get(typeName) || [];
             editor.setDecorations(decorationType, options);
+            this._currentDecorations.set(typeName, options); // Update internal state to reflect what's applied
         }
     }
 
@@ -248,7 +161,9 @@ export class DecorationManager {
     public dispose(): void {
         this._disposables.forEach(d => d.dispose());
         this._disposables = [];
-        // Decoration types are managed by ExtensionState, so no need to dispose them here.
         this._currentDecorations.clear();
+        // Dispose of decoration types to prevent memory leaks
+        this._decorationTypes.forEach(type => type.dispose());
+        this._decorationTypes.clear();
     }
 }

@@ -1,19 +1,19 @@
 import * as vscode from 'vscode';
-import { DocumentNode } from './documentNode';
 import { DocumentParser } from './documentParser';
-import { DecorationManager } from '../decorations/decorationManager'; // New import
-import { Configuration } from '../config/configuration';
+import { DecorationManager } from '../decorations/decorationManager';
+import { DocumentTree } from './documentTree';
+import { BlockNode } from './blockNode'; // Import BlockNode
 
 /**
- * Manages the document's parsed structure (DocumentNodes).
+ * Manages the document's parsed structure (DocumentTree of BlockNodes).
  * It acts as the single source of truth for the document's state
  * and notifies the DecorationManager of changes.
  */
 export class DocumentModel {
     private _document: vscode.TextDocument;
-    private _nodes: DocumentNode[] = [];
+    private _documentTree: DocumentTree; // Use DocumentTree
     private _parser: DocumentParser;
-    private _decorationManager: DecorationManager | undefined; // Reference to the DecorationManager
+    private _decorationManager: DecorationManager | undefined;
     private _disposables: vscode.Disposable[] = [];
 
     constructor(document: vscode.TextDocument) {
@@ -21,7 +21,7 @@ export class DocumentModel {
         this._parser = new DocumentParser();
 
         // Initial parse
-        this.parseDocument();
+        this._documentTree = this._parser.fullParse(this._document);
 
         // Listen for document changes
         vscode.workspace.onDidChangeTextDocument(this.onDidChangeTextDocument, this, this._disposables);
@@ -36,62 +36,63 @@ export class DocumentModel {
         // Trigger an initial full update via the manager
         const activeEditor = vscode.window.activeTextEditor;
         if (activeEditor && activeEditor.document === this._document) {
-            this._decorationManager.notifyDocumentNodesChanged(activeEditor);
+            // Pass the entire document tree for initial rendering
+            this._decorationManager.updateDecorations(this._documentTree, new vscode.Range(0, 0, this._document.lineCount, 0));
         }
     }
 
     /**
-     * Returns all parsed DocumentNodes for the current document.
+     * Returns all parsed BlockNodes for the current document in a flat array.
      */
-    public get nodes(): DocumentNode[] {
-        return this._nodes;
+    public get nodes(): BlockNode[] {
+        return this._documentTree.getAllNodesFlat();
     }
 
     public get document(): vscode.TextDocument {
         return this._document;
     }
 
-    /**
-     * Performs a full parse of the document and updates the internal nodes.
-     */
-    private parseDocument(): void {
-        this._nodes = this._parser.fullParse(this._document);
+    public get documentTree(): DocumentTree {
+        return this._documentTree;
     }
 
     /**
-     * Handles text document changes. Triggers incremental parsing and notifies the DecorationManager.
+     * Handles text document changes. Triggers parsing and decoration updates.
      */
     private onDidChangeTextDocument(event: vscode.TextDocumentChangeEvent): void {
         if (event.document !== this._document) {
             return;
         }
 
-        // Determine if the change is structural (adding/removing lines)
-        let isStructuralChange = false;
-        for (const change of event.contentChanges) {
-            const linesRemoved = change.range.end.line - change.range.start.line;
-            const linesAdded = (change.text.match(/\n/g) || []).length;
-
-            if (linesRemoved !== linesAdded || change.text.includes('\n') || change.rangeLength === 0 && change.text.length > 0 && change.text.includes('\n')) {
-                isStructuralChange = true;
-                break;
-            }
-        }
-
-        // Perform incremental parse
-        const { updatedNodes, affectedLineNumbers } = this._parser.incrementalParse(this._document);
-        this._nodes = updatedNodes; // Update the model's nodes with the incrementally parsed ones
-
         const activeEditor = vscode.window.activeTextEditor;
-        if (activeEditor && activeEditor.document === this._document && this._decorationManager) {
-            if (isStructuralChange) {
-                // For structural changes, trigger an immediate full update
-                this._decorationManager.triggerFullUpdateImmediate(activeEditor);
-            } else {
-                // For non-structural changes (e.g., typing on a single line), use the debounced update
-                this._decorationManager.notifyDocumentNodesChanged(activeEditor);
+        if (!activeEditor || activeEditor.document !== this._document || !this._decorationManager) {
+            return;
+        }
+
+        // Handle expandTemplateCommand trigger (if still needed, consider moving this logic)
+        // This logic is specific to a command and might be better handled outside the core parsing loop.
+        // For now, keeping it for functional parity, but it's a candidate for refactoring.
+        if (event.contentChanges.length === 1) {
+            const change = event.contentChanges[0];
+            const line = event.document.lineAt(change.range.start.line);
+            const lineText = line.text;
+
+            const typedNodeTriggerMatch = lineText.match(/^\s*@([a-zA-Z0-9_]+)\s$/);
+
+            if (typedNodeTriggerMatch && change.text === ' ') {
+                const typeName = typedNodeTriggerMatch[1];
+                vscode.commands.executeCommand('pointblank.expandTemplate', typeName, this);
+                return; // Command will trigger another event with new content
             }
         }
+
+        // Parse the document incrementally (or full parse for now)
+        const newDocumentTree = this._parser.parse(this._documentTree, event.contentChanges);
+        this._documentTree = newDocumentTree;
+
+        // Notify DecorationManager with the new tree. The DecorationManager will now
+        // always perform a full re-render, so a specific changedRange is not needed here.
+        this._decorationManager.updateDecorations(this._documentTree, new vscode.Range(0, 0, this._document.lineCount, 0));
     }
 
     /**
@@ -100,6 +101,7 @@ export class DocumentModel {
     public dispose(): void {
         this._disposables.forEach(d => d.dispose());
         this._disposables = [];
-        this._decorationManager = undefined; // Clear reference
+        this._decorationManager = undefined;
+        // No need to dispose _documentTree as it's immutable and managed by GC
     }
 }

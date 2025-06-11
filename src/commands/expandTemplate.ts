@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { TemplateService } from '../templates/templateService';
 import { DocumentModel } from '../document/documentModel';
 
-export async function expandTemplateCommand(typeName: string): Promise<void> {
+export async function expandTemplateCommand(typeName: string, documentModel: DocumentModel): Promise<void> {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
         return;
@@ -67,8 +67,7 @@ export async function expandTemplateCommand(typeName: string): Promise<void> {
 
     // After the edit is complete, explicitly trigger a re-parse and re-decoration.
     // This ensures the parser sees the *new* text and applies correct decorations.
-    const documentModel = (global as any).documentModels.get(document.uri.toString());
-    if (documentModel) {
-        documentModel.parseAndRender(document);
-    }
+    // The documentModel is passed, but explicit re-parsing/re-decoration is not needed here.
+    // The onDidChangeTextDocument event in DocumentModel will handle it automatically
+    // after the editor.edit operation completes.
 }
