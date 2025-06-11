@@ -73,10 +73,17 @@ export function activate(context: vscode.ExtensionContext): void {
         if (activeEditor) {
             decorationApplier.updateDecorations();
         }
-    }, 25); // Debounce time of 25ms
+    }, 30); // Debounce time of 30ms
 
     vscode.workspace.onDidChangeTextDocument(event => {
         if (activeEditor && event.document === activeEditor.document) {
+            debouncedUpdateDecorations();
+        }
+    }, null, context.subscriptions);
+
+    // NEW: Debounced update for visible range changes (scrolling)
+    vscode.window.onDidChangeTextEditorVisibleRanges(event => {
+        if (activeEditor && event.textEditor === activeEditor) {
             debouncedUpdateDecorations();
         }
     }, null, context.subscriptions);
