@@ -6,12 +6,6 @@ export class DocumentParser {
     private _cachedNodes: DocumentNode[] = [];
     private _inCodeBlock: boolean = false; // Track code block state across incremental updates
 
-    public parse(document: vscode.TextDocument, event?: vscode.TextDocumentChangeEvent): { allNodes: DocumentNode[], changedNodes: DocumentNode[] } {
-        const allNodes = this.fullParse(document);
-        // For now, we consider all nodes as potentially changed to force full re-decoration.
-        // In a future optimization, this could be refined to identify truly changed nodes.
-        return { allNodes, changedNodes: allNodes };
-    }
 
 public fullParse(document: vscode.TextDocument): DocumentNode[] {
         const nodes: DocumentNode[] = [];

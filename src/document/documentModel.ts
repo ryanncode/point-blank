@@ -3,6 +3,7 @@ import { DocumentNode } from './documentNode';
 import { DocumentParser } from './documentParser';
 import { DecorationRenderer } from '../decorations/decorationRenderer';
 import { debounce } from '../utils/debounce';
+import { Configuration } from '../config/configuration';
 
 /**
  * Manages the document's parsed structure (DocumentNodes) and orchestrates
@@ -23,20 +24,29 @@ export class DocumentModel {
         this._document = document;
         this._parser = new DocumentParser();
         this._decorationRenderer = new DecorationRenderer();
+        const configuration = Configuration.getInstance();
+        const debounceDelay = configuration.getDebounceDelay();
 
         // Initial parse and render
         this.parseAndRender(document);
 
-        // Debounce the decoration update
+        // Debounce the decoration update for document changes (typing, pasting, etc.)
         this._debouncedUpdateDecorations = debounce((editor: vscode.TextEditor) => {
             this.updateDecorations(editor);
-        }, 100); // Adjust debounce delay as needed
+        }, debounceDelay);
+
+        // Debounce the decoration update for visible range changes (scrolling) with a lower delay
+        this._debouncedUpdateVisibleRangeDecorations = debounce((editor: vscode.TextEditor) => {
+            this.updateDecorations(editor);
+        }, 20); // 20ms for visible range changes
 
         // Listen for document changes
         vscode.workspace.onDidChangeTextDocument(this.onDidChangeTextDocument, this, this._disposables);
         vscode.window.onDidChangeTextEditorVisibleRanges(this.onDidChangeTextEditorVisibleRanges, this, this._disposables);
         vscode.window.onDidChangeActiveTextEditor(this.onDidChangeActiveTextEditor, this, this._disposables);
     }
+
+    private _debouncedUpdateVisibleRangeDecorations: (editor: vscode.TextEditor) => void;
 
     /**
      * Returns all parsed DocumentNodes for the current document.
@@ -75,8 +85,18 @@ export class DocumentModel {
 
         const activeEditor = vscode.window.activeTextEditor;
         if (activeEditor && activeEditor.document === this._document) {
-            // Trigger debounced decoration update for the active editor
-            this._debouncedUpdateDecorations(activeEditor);
+            // Check if the change is on the active line and is a single character insertion/deletion
+            const isSingleCharChangeOnActiveLine = event.contentChanges.length === 1 &&
+                                                   event.contentChanges[0].range.start.line === activeEditor.selection.active.line &&
+                                                   (event.contentChanges[0].text.length === 1 || event.contentChanges[0].rangeLength === 1);
+
+            if (isSingleCharChangeOnActiveLine) {
+                // For immediate feedback on typing, update decorations for the current line directly
+                this.updateDecorations(activeEditor);
+            } else {
+                // For other document changes (e.g., paste, multi-line edit), use debounced update
+                this._debouncedUpdateDecorations(activeEditor);
+            }
         }
     }
 
@@ -87,7 +107,8 @@ export class DocumentModel {
         if (event.textEditor.document !== this._document) {
             return;
         }
-        this.updateDecorations(event.textEditor);
+        // Use a debounced update for visible range changes to prevent excessive re-renders during scrolling
+        this._debouncedUpdateVisibleRangeDecorations(event.textEditor);
     }
 
     /**
