@@ -90,45 +90,55 @@ export function activate(context: vscode.ExtensionContext): void {
         }
     }, null, context.subscriptions);
 
-    // Listen for changes in the text document.
-    // If the change occurs in the currently active editor's document,
-    // trigger a decoration update to reflect the latest content.
-    const debouncedUpdateDecorations = debounce((event?: vscode.TextDocumentChangeEvent) => {
+    // Debounced update for full document parsing and decoration
+    const debouncedFullUpdate = debounce((event?: vscode.TextDocumentChangeEvent) => {
         if (extensionState.activeEditor) {
-            const parsedNodes = documentParser.parse(extensionState.activeEditor.document, event); // Pass event for incremental parsing
-            decorationApplier.updateDecorations(extensionState.activeEditor, parsedNodes); // Pass parsed nodes
+            const parsedNodes = documentParser.parse(extensionState.activeEditor.document, event);
+            decorationApplier.updateDecorations(extensionState.activeEditor, parsedNodes);
         }
-    }, configuration.getDebounceDelay()); // Use configurable debounce delay
+    }, configuration.getDebounceDelay());
 
+    // Fast debounced update for visible range changes (scrolling)
+    const debouncedVisibleRangeUpdate = debounce(() => {
+        if (extensionState.activeEditor) {
+            const parsedNodes = documentParser.parse(extensionState.activeEditor.document);
+            decorationApplier.updateDecorations(extensionState.activeEditor, parsedNodes);
+        }
+    }, 20);
+
+    // Listen for text document changes
     vscode.workspace.onDidChangeTextDocument(event => {
         if (extensionState.activeEditor && event.document === extensionState.activeEditor.document) {
-            debouncedUpdateDecorations(event);
+            // Immediate update for the changed lines
+            const changedLines = event.contentChanges.map(c => c.range.start.line);
+            const uniqueChangedLines = [...new Set(changedLines)];
+            const parsedLines = documentParser.parse(event.document, event);
+            const lineNodes = parsedLines.filter(node => uniqueChangedLines.includes(node.lineNumber));
 
-            const editor = extensionState.activeEditor;
-            const document = event.document;
+            if (lineNodes.length > 0) {
+                decorationApplier.updateLineDecorations(extensionState.activeEditor, lineNodes);
+            }
+
+            // Trigger the full debounced update
+            debouncedFullUpdate(event);
+
             const change = event.contentChanges[0];
-
-            // Only trigger on single space insertion
             if (change && change.text === ' ' && change.rangeLength === 0) {
-                const line = document.lineAt(change.range.start.line);
-                // Match the text *before* the inserted space, including the bullet and @ prefix
+                const line = event.document.lineAt(change.range.start.line);
                 const textBeforeSpace = line.text.substring(0, change.range.start.character);
                 const match = textBeforeSpace.match(/^\s*[-*]?\s*@(\w+)$/);
-
                 if (match) {
                     const typeName = match[1];
-                    // Execute the command to handle the template expansion, passing the typeName
                     vscode.commands.executeCommand('pointblank.expandTemplate', typeName);
                 }
             }
         }
     }, null, context.subscriptions);
 
-    // Debounced update for visible range changes (scrolling)
+    // Listen for visible range changes (scrolling)
     vscode.window.onDidChangeTextEditorVisibleRanges(event => {
         if (extensionState.activeEditor && event.textEditor === extensionState.activeEditor) {
-            // No event object for visible range changes, so trigger a full parse
-            debouncedUpdateDecorations();
+            debouncedVisibleRangeUpdate();
         }
     }, null, context.subscriptions);
 }
