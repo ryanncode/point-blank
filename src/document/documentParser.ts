@@ -19,6 +19,8 @@ export class DocumentParser {
             let keyValue: KeyValueProperty | undefined;
             let isCodeBlockDelimiter = false;
             let isLineExcluded = false;
+            let isTypedNode = false;
+            let type: string | undefined;
 
             // Check for code block delimiters
             if (trimmedText.startsWith('```')) {
@@ -47,12 +49,19 @@ export class DocumentParser {
                 };
             }
 
-            // Determine parent for key-value lines
+            // Check for Typed Node pattern: - (TypeName)
+            const typedNodeMatch = lineTextFromNonWhitespace.match(/^\s*\((.+)\)/);
+            if (typedNodeMatch) {
+                isTypedNode = true;
+                type = typedNodeMatch[1];
+            }
+ 
+            // Determine parent for key-value lines and typed nodes
             let parentLineNum: number | undefined = undefined;
             if (isKeyValue) {
                 parentLineNum = currentParentLineNumber;
             } else if (!line.isEmptyOrWhitespace && !isCodeBlockDelimiter && !isLineExcluded) {
-                // This line is a potential parent node
+                // This line is a potential parent node (either a regular node or a typed node)
                 currentParentLineNumber = i;
             }
 
@@ -66,7 +75,9 @@ export class DocumentParser {
                 keyValue: keyValue,
                 parentLineNumber: parentLineNum,
                 isCodeBlockDelimiter: isCodeBlockDelimiter,
-                isExcluded: isLineExcluded
+                isExcluded: isLineExcluded,
+                isTypedNode: isTypedNode, // Populate new field
+                type: type // Populate new field
             };
             nodes.push(node);
         }

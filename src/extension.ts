@@ -11,8 +11,10 @@ import { Configuration } from './config/configuration';
 import { focusModeCommand } from './commands/focusMode';
 import { unfocusModeCommand } from './commands/unfocusMode';
 import { handleEnterKeyCommand } from './commands/handleEnterKey';
-import { DocumentParser } from './document/documentParser'; // New import
-import { DocumentNode } from './document/documentNode'; // New import
+import { expandTemplateCommand } from './commands/expandTemplate'; // New import
+import { DocumentParser } from './document/documentParser';
+import { DocumentNode } from './document/documentNode';
+import { TemplateService } from './templates/templateService';
 
 /**
  * Activates the Point Blank extension.
@@ -29,7 +31,8 @@ export function activate(context: vscode.ExtensionContext): void {
     const extensionState = ExtensionState.getInstance();
     const configuration = Configuration.getInstance();
     const decorationApplier = new DecorationApplier();
-    const documentParser = new DocumentParser(); // New instance
+    const documentParser = new DocumentParser();
+    const templateService = TemplateService.getInstance(); // New instance
 
     // Initialize decorations based on current configuration
     configuration.initializeDecorationTypes();
@@ -45,6 +48,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
     // Register custom Enter key command
     context.subscriptions.push(vscode.commands.registerCommand('pointblank.handleEnterKey', handleEnterKeyCommand));
+
+    // Register the new template expansion command
+    context.subscriptions.push(vscode.commands.registerCommand('pointblank.expandTemplate', expandTemplateCommand));
 
     // Initial update of decorations if an editor is already active.
     if (extensionState.activeEditor) {
@@ -97,6 +103,24 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.workspace.onDidChangeTextDocument(event => {
         if (extensionState.activeEditor && event.document === extensionState.activeEditor.document) {
             debouncedUpdateDecorations();
+
+            const editor = extensionState.activeEditor;
+            const document = event.document;
+            const change = event.contentChanges[0];
+
+            // Only trigger on single space insertion
+            if (change && change.text === ' ' && change.rangeLength === 0) {
+                const line = document.lineAt(change.range.start.line);
+                // Match the text *before* the inserted space, including the bullet and @ prefix
+                const textBeforeSpace = line.text.substring(0, change.range.start.character);
+                const match = textBeforeSpace.match(/^\s*[-*]?\s*@(\w+)$/);
+
+                if (match) {
+                    const typeName = match[1];
+                    // Execute the command to handle the template expansion, passing the typeName
+                    vscode.commands.executeCommand('pointblank.expandTemplate', typeName);
+                }
+            }
         }
     }, null, context.subscriptions);
 

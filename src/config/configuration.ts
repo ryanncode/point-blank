@@ -106,5 +106,14 @@ export class Configuration {
             color: configuration.get('keyValueColor') || '#6c757d', // Default fallback
             rangeBehavior: vscode.DecorationRangeBehavior.ClosedOpen,
         }));
+
+        /**
+         * Defines the decoration type for typed nodes (e.g., "(Book)").
+         */
+        this._extensionState.setDecorationType('typedNodeDecorationType', vscode.window.createTextEditorDecorationType({
+            color: new vscode.ThemeColor('textLink.foreground'), // Example: use a link-like color
+            fontWeight: 'bold',
+            rangeBehavior: vscode.DecorationRangeBehavior.ClosedOpen,
+        }));
     }
 }

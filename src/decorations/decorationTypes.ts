@@ -15,3 +15,4 @@ export const plusBulletDecorationType = extensionState.getDecorationType('plusBu
 export const minusBulletDecorationType = extensionState.getDecorationType('minusBulletDecorationType') as vscode.TextEditorDecorationType;
 export const numberedBulletDecorationType = extensionState.getDecorationType('numberedBulletDecorationType') as vscode.TextEditorDecorationType;
 export const blockquoteDecorationType = extensionState.getDecorationType('blockquoteDecorationType') as vscode.TextEditorDecorationType;
+export const typedNodeDecorationType = extensionState.getDecorationType('typedNodeDecorationType') as vscode.TextEditorDecorationType;

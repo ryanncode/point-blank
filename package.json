@@ -80,6 +80,14 @@
           "type": "string",
           "default": "#6c757d",
           "description": "The color for Key:: properties."
+        },
+        "pointblank.templates": {
+          "type": "object",
+          "description": "Map of type names to their template file paths.",
+          "default": {
+            "Book": ".vscode/templates/book.md",
+            "Person": ".vscode/templates/person.md"
+          }
         }
       }
     }

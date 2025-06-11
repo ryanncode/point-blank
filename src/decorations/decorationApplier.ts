@@ -35,6 +35,7 @@ export class DecorationApplier {
         const numberedBulletDecorations: vscode.DecorationOptions[] = [];
         const blockquoteDecorations: vscode.DecorationOptions[] = [];
         const keyValueDecorations: vscode.DecorationOptions[] = [];
+        const typedNodeDecorations: vscode.DecorationOptions[] = [];
 
         // Iterate through parsed nodes
         for (const node of parsedNodes) {
@@ -50,6 +51,12 @@ export class DecorationApplier {
             // Skip lines that are part of a code block, or are delimiters, or are excluded, or are empty
             if (node.isCodeBlockDelimiter || node.isExcluded || node.line.isEmptyOrWhitespace) {
                 continue;
+            }
+
+            if (node.isTypedNode) {
+                // Apply decoration to the entire line for typed nodes
+                typedNodeDecorations.push({ range: node.line.range });
+                continue; // Skip other bullet checks for typed nodes
             }
 
             if (node.isKeyValue && node.keyValue) {
@@ -105,5 +112,6 @@ export class DecorationApplier {
         activeEditor.setDecorations(this._extensionState.getDecorationType('numberedBulletDecorationType')!, numberedBulletDecorations);
         activeEditor.setDecorations(this._extensionState.getDecorationType('blockquoteDecorationType')!, blockquoteDecorations);
         activeEditor.setDecorations(this._extensionState.getDecorationType('keyValueDecorationType')!, keyValueDecorations);
+        activeEditor.setDecorations(this._extensionState.getDecorationType('typedNodeDecorationType')!, typedNodeDecorations);
     }
 }
