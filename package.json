@@ -38,6 +38,11 @@
         "pointblank.level5Color": {
           "type": "string",
           "description": "Color for level 5 decorators."
+        },
+        "pointblank.blockquoteColor": {
+          "type": "string",
+          "default": "#808080",
+          "description": "Color for blockquote decorators."
         }
       }
     }

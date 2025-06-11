@@ -5,6 +5,7 @@ let _starBulletDecorationType: vscode.TextEditorDecorationType;
 let _plusBulletDecorationType: vscode.TextEditorDecorationType;
 let _minusBulletDecorationType: vscode.TextEditorDecorationType;
 let _numberedBulletDecorationType: vscode.TextEditorDecorationType;
+let _blockquoteDecorationType: vscode.TextEditorDecorationType;
 
 export function initializeDecorations(): void {
     const configuration = vscode.workspace.getConfiguration('pointblank');
@@ -15,6 +16,7 @@ export function initializeDecorations(): void {
     if (_plusBulletDecorationType) { _plusBulletDecorationType.dispose(); }
     if (_minusBulletDecorationType) { _minusBulletDecorationType.dispose(); }
     if (_numberedBulletDecorationType) { _numberedBulletDecorationType.dispose(); }
+    if (_blockquoteDecorationType) { _blockquoteDecorationType.dispose(); }
 
     /**
      * Defines the decoration type for the default bullet points.
@@ -60,6 +62,14 @@ export function initializeDecorations(): void {
     _numberedBulletDecorationType = vscode.window.createTextEditorDecorationType({
         color: configuration.get('level5Color') || new vscode.ThemeColor('editorBracketHighlight.foreground3'),
     });
+
+    /**
+     * Defines the decoration type for blockquote prefixes (>).
+     * This provides a subtle color for blockquote elements.
+     */
+    _blockquoteDecorationType = vscode.window.createTextEditorDecorationType({
+        color: configuration.get('blockquoteColor') || new vscode.ThemeColor('editor.foreground'),
+    });
 }
 
 // Initialize decorations on extension load
@@ -70,5 +80,6 @@ export {
     _starBulletDecorationType as starBulletDecorationType,
     _plusBulletDecorationType as plusBulletDecorationType,
     _minusBulletDecorationType as minusBulletDecorationType,
-    _numberedBulletDecorationType as numberedBulletDecorationType
+    _numberedBulletDecorationType as numberedBulletDecorationType,
+    _blockquoteDecorationType as blockquoteDecorationType
 };

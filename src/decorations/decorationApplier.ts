@@ -4,7 +4,8 @@ import {
     starBulletDecorationType,
     plusBulletDecorationType,
     minusBulletDecorationType,
-    numberedBulletDecorationType
+    numberedBulletDecorationType,
+    blockquoteDecorationType
 } from '../constants';
 import { isExcludedLine } from '../utils/lineFilters';
 
@@ -50,6 +51,7 @@ export class DecorationApplier {
         const plusBulletDecorations: vscode.DecorationOptions[] = [];
         const minusBulletDecorations: vscode.DecorationOptions[] = [];
         const numberedBulletDecorations: vscode.DecorationOptions[] = [];
+        const blockquoteDecorations: vscode.DecorationOptions[] = [];
 
         let inCodeBlock = false; // State to track if we are inside a fenced code block (e.g., ```)
 
@@ -81,6 +83,13 @@ export class DecorationApplier {
 
             const firstCharIndex = line.firstNonWhitespaceCharacterIndex;
             const firstChar = line.text.charAt(firstCharIndex);
+
+            // Check for blockquote prefix (>) and apply specific decoration.
+            if (firstChar === '>' && line.text.charAt(firstCharIndex + 1) === ' ') {
+                const range = new vscode.Range(i, firstCharIndex, i, firstCharIndex + 1);
+                blockquoteDecorations.push({ range });
+                continue;
+            }
 
             // Check for custom bullet points (*, +, -) and apply specific decoration.
             // These checks ensure that the character is followed by a space to distinguish
@@ -122,5 +131,6 @@ export class DecorationApplier {
         this.activeEditor.setDecorations(plusBulletDecorationType, plusBulletDecorations);
         this.activeEditor.setDecorations(minusBulletDecorationType, minusBulletDecorations);
         this.activeEditor.setDecorations(numberedBulletDecorationType, numberedBulletDecorations);
+        this.activeEditor.setDecorations(blockquoteDecorationType, blockquoteDecorations);
     }
 }
