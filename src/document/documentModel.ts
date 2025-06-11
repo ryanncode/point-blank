@@ -66,14 +66,31 @@ export class DocumentModel {
             return;
         }
 
+        // Determine if the change is structural (adding/removing lines)
+        let isStructuralChange = false;
+        for (const change of event.contentChanges) {
+            const linesRemoved = change.range.end.line - change.range.start.line;
+            const linesAdded = (change.text.match(/\n/g) || []).length;
+
+            if (linesRemoved !== linesAdded || change.text.includes('\n') || change.rangeLength === 0 && change.text.length > 0 && change.text.includes('\n')) {
+                isStructuralChange = true;
+                break;
+            }
+        }
+
         // Perform incremental parse
         const { updatedNodes, affectedLineNumbers } = this._parser.incrementalParse(this._document);
         this._nodes = updatedNodes; // Update the model's nodes with the incrementally parsed ones
 
         const activeEditor = vscode.window.activeTextEditor;
         if (activeEditor && activeEditor.document === this._document && this._decorationManager) {
-            // Notify the DecorationManager about the document change
-            this._decorationManager.notifyDocumentNodesChanged(activeEditor);
+            if (isStructuralChange) {
+                // For structural changes, trigger an immediate full update
+                this._decorationManager.triggerFullUpdateImmediate(activeEditor);
+            } else {
+                // For non-structural changes (e.g., typing on a single line), use the debounced update
+                this._decorationManager.notifyDocumentNodesChanged(activeEditor);
+            }
         }
     }
 

@@ -87,7 +87,7 @@ export class DecorationManager {
      * Triggers an immediate full document decoration update.
      * Used when a document is opened or becomes active to ensure immediate display.
      */
-    private triggerFullUpdateImmediate(editor: vscode.TextEditor): void {
+    public triggerFullUpdateImmediate(editor: vscode.TextEditor): void {
         const documentModel = this._extensionState.getDocumentModel(editor.document.uri.toString());
         if (!documentModel) {
             return;
