@@ -110,19 +110,22 @@ public fullParse(document: vscode.TextDocument): DocumentNode[] {
         event: vscode.TextDocumentChangeEvent,
         oldNodes: DocumentNode[]
     ): { updatedNodes: DocumentNode[], affectedLineNumbers: Set<number> } {
-        const updatedNodes: DocumentNode[] = [...oldNodes];
         const affectedLineNumbers = new Set<number>();
 
-        // Determine the range of lines affected by the change
-        let startLine = event.contentChanges.length > 0 ? event.contentChanges[0].range.start.line : 0;
-        let endLine = event.contentChanges.length > 0 ? event.contentChanges[0].range.end.line : document.lineCount - 1;
+        let changeStartLine = event.contentChanges.length > 0 ? event.contentChanges[0].range.start.line : 0;
+        let changeEndLine = event.contentChanges.length > 0 ? event.contentChanges[0].range.end.line : document.lineCount - 1;
+        const linesRemoved = event.contentChanges.length > 0 ? event.contentChanges[0].range.end.line - event.contentChanges[0].range.start.line : 0;
+        const linesAdded = event.contentChanges.length > 0 ? event.contentChanges[0].text.split('\n').length - 1 : 0;
+        const deltaLines = linesAdded - linesRemoved;
 
-        // Extend the affected range to include potential structural changes (e.g., indentation changes)
-        // For simplicity, we'll re-parse from the start of the document for now,
-        // but this is where more sophisticated incremental parsing logic would go.
-        // A more advanced implementation would track indentation levels and re-parse
-        // only the necessary subtree.
-        startLine = 0; // For now, force full re-parse on change for simplicity and correctness
+        // Determine the effective start and end lines for re-parsing
+        // This is where the "Smart Structural Analysis" comes in.
+        // For now, we'll still re-parse a larger section to ensure correctness,
+        // but we'll refine this in later phases.
+
+        // Start from the beginning of the document to correctly re-evaluate parentage and code blocks
+        let reparseStartLine = 0;
+        let reparseEndLine = document.lineCount - 1;
 
         // Re-parse the affected lines and update the nodes array
         const newNodes: DocumentNode[] = [];
@@ -138,15 +141,30 @@ public fullParse(document: vscode.TextDocument): DocumentNode[] {
             }
             node.isCodeBlockDelimiter = node.trimmedText.startsWith('```');
 
-            // For now, we're doing a full re-parse, so all nodes are "new"
+            // Determine parent for key-value lines and typed nodes
+            // This logic needs to be applied during incremental parse as well
+            let currentParentLineNumber: number | undefined = undefined;
+            if (i > 0 && newNodes[i - 1]) {
+                currentParentLineNumber = newNodes[i - 1].parentLineNumber; // Inherit from previous node
+                if (!newNodes[i - 1].isKeyValue && !newNodes[i - 1].line.isEmptyOrWhitespace && !newNodes[i - 1].isCodeBlockDelimiter && !newNodes[i - 1].isExcluded) {
+                    currentParentLineNumber = newNodes[i - 1].lineNumber;
+                }
+            }
+
+            if (node.isKeyValue) {
+                node.parentLineNumber = currentParentLineNumber;
+            } else if (!line.isEmptyOrWhitespace && !node.isCodeBlockDelimiter && !node.isExcluded) {
+                node.parentLineNumber = i; // This node is a new parent
+            } else {
+                node.parentLineNumber = currentParentLineNumber; // Inherit parent if not a new parent
+            }
+
             newNodes.push(node);
             affectedLineNumbers.add(i);
         }
 
-        // In a true incremental parse, you would merge newNodes into updatedNodes
-        // based on the affected range. For this refactor, we're simplifying by
-        // effectively doing a full re-parse on every change for correctness,
-        // and will optimize incremental parsing later if needed.
+        // For Phase 2, we are still doing a full re-parse to ensure correctness of parentage.
+        // The optimization will come in Phase 3.
         return { updatedNodes: newNodes, affectedLineNumbers };
     }
 }

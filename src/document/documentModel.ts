@@ -18,7 +18,7 @@ export class DocumentModel {
     private _disposables: vscode.Disposable[] = [];
 
     // Debounce the decoration update to avoid excessive re-renders during rapid typing
-    private _debouncedUpdateDecorations: (editor: vscode.TextEditor) => void;
+    private _debouncedUpdateDecorations: (editor: vscode.TextEditor, affectedLineNumbers: Set<number>) => void;
 
     constructor(document: vscode.TextDocument) {
         this._document = document;
@@ -31,8 +31,8 @@ export class DocumentModel {
         this.parseAndRender(document);
 
         // Debounce the decoration update for document changes (typing, pasting, etc.)
-        this._debouncedUpdateDecorations = debounce((editor: vscode.TextEditor) => {
-            this.updateDecorations(editor);
+        this._debouncedUpdateDecorations = debounce((editor: vscode.TextEditor, affectedLineNumbers: Set<number>) => {
+            this.updateDecorations(editor, affectedLineNumbers);
         }, debounceDelay);
 
         // Debounce the decoration update for visible range changes (scrolling) with a lower delay
@@ -86,7 +86,7 @@ export class DocumentModel {
         const activeEditor = vscode.window.activeTextEditor;
         if (activeEditor && activeEditor.document === this._document) {
             // Always use the debounced update for document changes.
-            this._debouncedUpdateDecorations(activeEditor);
+            this._debouncedUpdateDecorations(activeEditor, affectedLineNumbers);
         }
     }
 
@@ -113,24 +113,30 @@ export class DocumentModel {
     /**
      * Calculates and applies decorations for the currently visible lines.
      * This method is called by the debounced update or on visible range changes.
+     * @param editor The text editor to apply decorations to.
+     * @param affectedLineNumbers Optional set of line numbers that were affected by a change.
+     *                            If provided, only nodes on these lines will be considered for re-decoration.
      */
-    private updateDecorations(editor: vscode.TextEditor): void {
+    private updateDecorations(editor: vscode.TextEditor, affectedLineNumbers?: Set<number>): void {
         const decorationsToApply = new Map<string, vscode.DecorationOptions[]>();
         const visibleRanges = editor.visibleRanges;
         const bufferLines = 20; // Extend visible range by a few lines for smoother scrolling
 
-        // Collect all nodes that are within the extended visible range
-        const nodesInView: DocumentNode[] = [];
+        // Collect nodes that are both within the extended visible range AND (if provided) in affectedLineNumbers
+        const nodesToProcess: DocumentNode[] = [];
         this._nodes.forEach(node => {
-            if (visibleRanges.some(range =>
+            const isVisible = visibleRanges.some(range =>
                 range.start.line <= node.lineNumber && node.lineNumber <= range.end.line + bufferLines
-            )) {
-                nodesInView.push(node);
+            );
+            const isAffected = affectedLineNumbers ? affectedLineNumbers.has(node.lineNumber) : true;
+
+            if (isVisible && isAffected) {
+                nodesToProcess.push(node);
             }
         });
 
         // Calculate decorations for these nodes
-        this._decorationRenderer.calculateDecorations(nodesInView, decorationsToApply);
+        this._decorationRenderer.calculateDecorations(nodesToProcess, decorationsToApply);
 
         // Apply the calculated decorations
         this._decorationRenderer.applyDecorations(editor, decorationsToApply);
