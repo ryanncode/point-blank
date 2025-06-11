@@ -23,6 +23,10 @@
       {
         "command": "pointblank.unfocusMode",
         "title": "Point Blank: Unfocus"
+      },
+      {
+        "command": "pointblank.handleEnterKey",
+        "title": "Point Blank: Handle Enter Key"
       }
     ],
     "keybindings": [
@@ -37,6 +41,11 @@
         "key": "alt+u",
         "mac": "alt+u",
         "when": "editorTextFocus"
+      },
+      {
+        "command": "pointblank.handleEnterKey",
+        "key": "enter",
+        "when": "editorTextFocus && !editorHasSelection"
       }
     ],
     "configuration": {

@@ -10,6 +10,7 @@ import { ExtensionState } from './state/extensionState';
 import { Configuration } from './config/configuration';
 import { focusModeCommand } from './commands/focusMode';
 import { unfocusModeCommand } from './commands/unfocusMode';
+import { handleEnterKeyCommand } from './commands/handleEnterKey';
 
 /**
  * Activates the Point Blank extension.
@@ -38,6 +39,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
     // Register Unfocus command
     context.subscriptions.push(vscode.commands.registerCommand('pointblank.unfocusMode', unfocusModeCommand));
+
+    // Register custom Enter key command
+    context.subscriptions.push(vscode.commands.registerCommand('pointblank.handleEnterKey', handleEnterKeyCommand));
 
     // Initial update of decorations if an editor is already active.
     if (extensionState.activeEditor) {
