@@ -178,38 +178,61 @@ export class DecorationApplier {
             return;
         }
 
-        // Shift existing decorations down by one line for all lines below the insertion point
-        for (const type of this._decorations.keys()) {
-            const existingDecorations = this._decorations.get(type) || [];
-            const shiftedDecorations: vscode.DecorationOptions[] = [];
+        const affectedDecorationTypes = new Set<string>();
+        const newDecorations: Map<string, vscode.DecorationOptions[]> = new Map();
 
-            for (const decoration of existingDecorations) {
-                if (decoration.range.start.line >= insertedLineNumber) {
+        // Initialize newDecorations map with empty arrays for all types
+        for (const type of this._decorations.keys()) {
+            newDecorations.set(type, []);
+        }
+
+        // Process existing decorations: shift and filter out lines to be recalculated
+        for (const [type, decorations] of this._decorations.entries()) {
+            const updatedForType: vscode.DecorationOptions[] = [];
+            for (const decoration of decorations) {
+                const line = decoration.range.start.line;
+                if (line === originalLineNode.lineNumber) {
+                    // This line will be recalculated, so skip existing decorations for it
+                    affectedDecorationTypes.add(type);
+                    continue;
+                }
+
+                if (line >= insertedLineNumber) {
                     // Shift decoration down by one line
-                    shiftedDecorations.push({
+                    updatedForType.push({
                         range: new vscode.Range(
-                            decoration.range.start.line + 1,
+                            line + 1,
                             decoration.range.start.character,
                             decoration.range.end.line + 1,
                             decoration.range.end.character
                         )
                     });
+                    affectedDecorationTypes.add(type);
                 } else {
-                    shiftedDecorations.push(decoration);
+                    // Keep decorations for lines above the insertion point as they are
+                    updatedForType.push(decoration);
                 }
             }
-            this._decorations.set(type, shiftedDecorations);
+            newDecorations.set(type, updatedForType);
         }
 
-        // Clear decorations for the original line and the new line using the helper
-        const linesToClear = new Set<number>();
-        linesToClear.add(originalLineNode.lineNumber);
-        linesToClear.add(newNode.lineNumber);
-        this._clearDecorationsForLines(linesToClear);
+        // Update the internal _decorations map with the shifted and filtered decorations
+        this._decorations = newDecorations;
 
-        // Recalculate and apply decorations for the affected lines
-        this.calculateDecorations([originalLineNode, newNode]);
-        this.applyAllDecorations(activeEditor);
+        // Recalculate decorations for the original line and the new line
+        // This will add new decorations to the updated _decorations map
+        const newlyCalculatedTypes = new Set<string>();
+        this.calculateDecorations([originalLineNode, newNode], newlyCalculatedTypes);
+
+        // Merge newly calculated types into affectedDecorationTypes
+        for (const type of newlyCalculatedTypes) {
+            affectedDecorationTypes.add(type);
+        }
+
+        // Apply decorations only for the types that were affected or newly calculated
+        for (const type of affectedDecorationTypes) {
+            activeEditor.setDecorations(this._extensionState.getDecorationType(type)!, this._decorations.get(type)!);
+        }
     }
 
     /**
