@@ -24,6 +24,7 @@ yarn-error.log*
 Thumbs.db
 README-default.md
 vsc-extension-quickstart.md
+notes/
 
 # Logs
 *.log

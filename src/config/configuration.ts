@@ -98,5 +98,13 @@ export class Configuration {
         this._extensionState.setDecorationType('blockquoteDecorationType', vscode.window.createTextEditorDecorationType({
             color: configuration.get('blockquoteColor') || new vscode.ThemeColor('editor.foreground'),
         }));
+
+        /**
+         * Defines the decoration type for 'Key::' properties.
+         */
+        this._extensionState.setDecorationType('keyValueDecorationType', vscode.window.createTextEditorDecorationType({
+            color: configuration.get('keyValueColor') || '#6c757d', // Default fallback
+            rangeBehavior: vscode.DecorationRangeBehavior.ClosedOpen,
+        }));
     }
 }

@@ -34,6 +34,7 @@ export class DecorationApplier {
         const minusBulletDecorations: vscode.DecorationOptions[] = [];
         const numberedBulletDecorations: vscode.DecorationOptions[] = [];
         const blockquoteDecorations: vscode.DecorationOptions[] = [];
+        const keyValueDecorations: vscode.DecorationOptions[] = [];
 
         let inCodeBlock = false; // State to track if we are inside a fenced code block (e.g., ```)
 
@@ -66,6 +67,17 @@ export class DecorationApplier {
                 }
 
                 const firstCharIndex = line.firstNonWhitespaceCharacterIndex;
+                const lineText = line.text.substring(firstCharIndex); // Text from first non-whitespace char
+
+                // Check for Key:: Value pattern
+                const keyValueMatch = lineText.match(/^(\S+::)\s/);
+                if (keyValueMatch) {
+                    const keyPart = keyValueMatch[1];
+                    const range = new vscode.Range(i, firstCharIndex, i, firstCharIndex + keyPart.length);
+                    keyValueDecorations.push({ range });
+                    continue; // Skip other bullet checks for key-value lines
+                }
+
                 const firstChar = line.text.charAt(firstCharIndex);
 
                 // Check for blockquote prefix (>) and apply specific decoration.
@@ -117,5 +129,6 @@ export class DecorationApplier {
         activeEditor.setDecorations(this._extensionState.getDecorationType('minusBulletDecorationType')!, minusBulletDecorations);
         activeEditor.setDecorations(this._extensionState.getDecorationType('numberedBulletDecorationType')!, numberedBulletDecorations);
         activeEditor.setDecorations(this._extensionState.getDecorationType('blockquoteDecorationType')!, blockquoteDecorations);
+        activeEditor.setDecorations(this._extensionState.getDecorationType('keyValueDecorationType')!, keyValueDecorations);
     }
 }
