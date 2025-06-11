@@ -2,8 +2,6 @@
 
 Point Blank: A VS Code extension for plain text and Markdown outlining, with smart folding, custom styling, focus mode, and powerful templating for node types and key-value properties.
 
-![banner](assets/banner.png)
-
 ## Features
 
 - **Indent-Based Folding:** Automatically creates folding ranges based on indentation, allowing you to collapse and expand blocks of text.
