@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { TemplateService } from '../templates/templateService';
 import { DocumentModel } from '../document/documentModel';
 
-export async function expandTemplateCommand(typeName: string, documentModel: DocumentModel): Promise<void> {
+export async function expandTemplateCommand(typeName: string, _documentModel: DocumentModel): Promise<void> {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
         return;

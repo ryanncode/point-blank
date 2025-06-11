@@ -131,7 +131,7 @@ export class DecorationManager {
      * @param tree The current `DocumentTree`.
      * @param changedRange The range of lines that have changed.
      */
-    private applyDecorationsInternal(editor: vscode.TextEditor, tree: DocumentTree, changedRange: vscode.Range): void {
+    private applyDecorationsInternal(editor: vscode.TextEditor, tree: DocumentTree, _changedRange: vscode.Range): void {
         if (!editor) {
             return;
         }

@@ -45,7 +45,7 @@ export class DocumentParser {
      * @param changes The `vscode.TextDocumentContentChangeEvent` array.
      * @returns A new `DocumentTree` instance reflecting the changes.
      */
-    public parse(previousTree: DocumentTree, changes: readonly vscode.TextDocumentContentChangeEvent[]): DocumentTree {
+    public parse(previousTree: DocumentTree, _changes: readonly vscode.TextDocumentContentChangeEvent[]): DocumentTree {
         // For simplicity in the initial refactoring, a full parse is performed for any change.
         // The true incremental parsing logic will be implemented in a later iteration.
         // This ensures correctness while we establish the new data structures.

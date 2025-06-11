@@ -19,8 +19,8 @@ export class IndentFoldingRangeProvider implements vscode.FoldingRangeProvider {
      */
     public provideFoldingRanges(
         document: vscode.TextDocument,
-        _context: vscode.FoldingContext, // eslint-disable-line @typescript-eslint/no-unused-vars
-        _token: vscode.CancellationToken // eslint-disable-line @typescript-eslint/no-unused-vars
+        _context: vscode.FoldingContext,
+        _token: vscode.CancellationToken
     ): vscode.ProviderResult<vscode.FoldingRange[]> {
         const ranges: vscode.FoldingRange[] = [];
         // Stack to keep track of open folding blocks: { indent: indentation level, startLine: line number }
