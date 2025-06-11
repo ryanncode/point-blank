@@ -22,6 +22,9 @@ export async function expandTemplateCommand(typeName: string): Promise<void> {
         return;
     }
 
+    // Declare and initialize newTitleLineContent outside the editBuilder callback
+    let newTitleLineContent: string = '';
+
     await editor.edit(editBuilder => {
         // Delete the trigger text (e.g., "@Book ")
         // The range should cover from the first non-whitespace character to the cursor position (after the space)
@@ -46,8 +49,8 @@ export async function expandTemplateCommand(typeName: string): Promise<void> {
         // Insert the new title line, ensuring it starts with a bullet point
         // Insert the new title line, ensuring it starts with the original indentation
         // and the (TypeName) format.
-        const newTitleLine = `${currentIndent}(${typeName}) `;
-        editBuilder.insert(line.range.start, newTitleLine);
+        newTitleLineContent = `${currentIndent}(${typeName}) `; // Assign value here
+        editBuilder.insert(line.range.start, newTitleLineContent);
 
         // Insert template lines with appropriate indentation
         const templateLines = templateContent.split('\n').filter(l => l.trim() !== '');
@@ -58,6 +61,10 @@ export async function expandTemplateCommand(typeName: string): Promise<void> {
         });
         editBuilder.insert(line.range.end, propertiesText);
     });
+
+    // Set the cursor position back to the end of the newTitleLine
+    const newCursorPosition = new vscode.Position(line.lineNumber, newTitleLineContent.length);
+    editor.selection = new vscode.Selection(newCursorPosition, newCursorPosition);
 
     // After the edit is complete, explicitly trigger a re-parse and re-decoration.
     // This ensures the parser sees the *new* text and applies correct decorations.

@@ -53,9 +53,9 @@ export class DecorationApplier {
                 continue;
             }
 
-            if (node.isTypedNode) {
-                // Apply decoration to the entire line for typed nodes
-                typedNodeDecorations.push({ range: node.line.range });
+            if (node.isTypedNode && node.typedNodeRange) {
+                // Apply decoration only to the typed node part (e.g., "(Book)")
+                typedNodeDecorations.push({ range: node.typedNodeRange });
                 continue; // Skip other bullet checks for typed nodes
             }
 

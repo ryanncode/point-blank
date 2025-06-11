@@ -19,6 +19,7 @@ export interface DocumentNode {
     // Placeholders for future features
     isTypedNode?: boolean;
     type?: string;
+    typedNodeRange?: vscode.Range; // New field for the range of the typed node (e.g., "(Book)")
     isTemplate?: boolean;
     templateName?: string;
     tags?: string[];

@@ -51,9 +51,13 @@ export class DocumentParser {
 
             // Check for Typed Node pattern: - (TypeName)
             const typedNodeMatch = lineTextFromNonWhitespace.match(/^\s*\((.+)\)/);
+            let typedNodeRange: vscode.Range | undefined;
             if (typedNodeMatch) {
                 isTypedNode = true;
                 type = typedNodeMatch[1];
+                const startIndex = firstCharIndex + typedNodeMatch[0].indexOf('(');
+                const endIndex = startIndex + typedNodeMatch[0].length - typedNodeMatch[0].indexOf('(');
+                typedNodeRange = new vscode.Range(i, startIndex, i, endIndex);
             }
  
             // Determine parent for key-value lines and typed nodes
@@ -77,7 +81,8 @@ export class DocumentParser {
                 isCodeBlockDelimiter: isCodeBlockDelimiter,
                 isExcluded: isLineExcluded,
                 isTypedNode: isTypedNode, // Populate new field
-                type: type // Populate new field
+                type: type, // Populate new field
+                typedNodeRange: typedNodeRange // Populate new field
             };
             nodes.push(node);
         }
