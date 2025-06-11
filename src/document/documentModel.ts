@@ -1,52 +1,44 @@
 import * as vscode from 'vscode';
 import { DocumentNode } from './documentNode';
 import { DocumentParser } from './documentParser';
-import { DecorationRenderer } from '../decorations/decorationRenderer';
-import { debounce } from '../utils/debounce';
+import { DecorationManager } from '../decorations/decorationManager'; // New import
 import { Configuration } from '../config/configuration';
 
 /**
- * Manages the document's parsed structure (DocumentNodes) and orchestrates
- * updates to decorations based on document changes. It acts as the single
- * source of truth for the document's state.
+ * Manages the document's parsed structure (DocumentNodes).
+ * It acts as the single source of truth for the document's state
+ * and notifies the DecorationManager of changes.
  */
 export class DocumentModel {
     private _document: vscode.TextDocument;
     private _nodes: DocumentNode[] = [];
     private _parser: DocumentParser;
-    private _decorationRenderer: DecorationRenderer;
+    private _decorationManager: DecorationManager | undefined; // Reference to the DecorationManager
     private _disposables: vscode.Disposable[] = [];
-
-    // Debounce the decoration update to avoid excessive re-renders during rapid typing
-    private _debouncedUpdateDecorations: (editor: vscode.TextEditor, affectedLineNumbers: Set<number>) => void;
 
     constructor(document: vscode.TextDocument) {
         this._document = document;
         this._parser = new DocumentParser();
-        this._decorationRenderer = new DecorationRenderer();
-        const configuration = Configuration.getInstance();
-        const debounceDelay = configuration.getDebounceDelay();
 
-        // Initial parse and render
-        this.parseAndRender(document);
-
-        // Debounce the decoration update for document changes (typing, pasting, etc.)
-        this._debouncedUpdateDecorations = debounce((editor: vscode.TextEditor, affectedLineNumbers: Set<number>) => {
-            this.updateDecorations(editor, affectedLineNumbers);
-        }, debounceDelay);
-
-        // Debounce the decoration update for visible range changes (scrolling) with a lower delay
-        this._debouncedUpdateVisibleRangeDecorations = debounce((editor: vscode.TextEditor) => {
-            this.updateDecorations(editor);
-        }, 20); // 20ms for visible range changes
+        // Initial parse
+        this.parseDocument();
 
         // Listen for document changes
         vscode.workspace.onDidChangeTextDocument(this.onDidChangeTextDocument, this, this._disposables);
-        vscode.window.onDidChangeTextEditorVisibleRanges(this.onDidChangeTextEditorVisibleRanges, this, this._disposables);
-        vscode.window.onDidChangeActiveTextEditor(this.onDidChangeActiveTextEditor, this, this._disposables);
     }
 
-    private _debouncedUpdateVisibleRangeDecorations: (editor: vscode.TextEditor) => void;
+    /**
+     * Sets the DecorationManager instance for this DocumentModel.
+     * This is called after the DocumentModel is created and registered.
+     */
+    public setDecorationManager(manager: DecorationManager): void {
+        this._decorationManager = manager;
+        // Trigger an initial full update via the manager
+        const activeEditor = vscode.window.activeTextEditor;
+        if (activeEditor && activeEditor.document === this._document) {
+            this._decorationManager.notifyDocumentNodesChanged(activeEditor);
+        }
+    }
 
     /**
      * Returns all parsed DocumentNodes for the current document.
@@ -60,19 +52,14 @@ export class DocumentModel {
     }
 
     /**
-     * Performs a full parse of the document and updates all decorations.
-     * This is typically called on document open or significant changes.
+     * Performs a full parse of the document and updates the internal nodes.
      */
-    private parseAndRender(document: vscode.TextDocument): void {
-        this._nodes = this._parser.fullParse(document);
-        const activeEditor = vscode.window.activeTextEditor;
-        if (activeEditor && activeEditor.document === this._document) {
-            this.updateDecorations(activeEditor);
-        }
+    private parseDocument(): void {
+        this._nodes = this._parser.fullParse(this._document);
     }
 
     /**
-     * Handles text document changes. Triggers incremental parsing and debounced decoration updates.
+     * Handles text document changes. Triggers incremental parsing and notifies the DecorationManager.
      */
     private onDidChangeTextDocument(event: vscode.TextDocumentChangeEvent): void {
         if (event.document !== this._document) {
@@ -84,62 +71,10 @@ export class DocumentModel {
         this._nodes = updatedNodes; // Update the model's nodes with the incrementally parsed ones
 
         const activeEditor = vscode.window.activeTextEditor;
-        if (activeEditor && activeEditor.document === this._document) {
-            // Always use the debounced update for document changes.
-            this._debouncedUpdateDecorations(activeEditor, affectedLineNumbers);
+        if (activeEditor && activeEditor.document === this._document && this._decorationManager) {
+            // Notify the DecorationManager about the document change
+            this._decorationManager.notifyDocumentNodesChanged(activeEditor);
         }
-    }
-
-    /**
-     * Handles changes in visible ranges (scrolling).
-     */
-    private onDidChangeTextEditorVisibleRanges(event: vscode.TextEditorVisibleRangesChangeEvent): void {
-        if (event.textEditor.document !== this._document) {
-            return;
-        }
-        // Use a debounced update for visible range changes to prevent excessive re-renders during scrolling
-        this._debouncedUpdateVisibleRangeDecorations(event.textEditor);
-    }
-
-    /**
-     * Handles active text editor changes.
-     */
-    private onDidChangeActiveTextEditor(editor: vscode.TextEditor | undefined): void {
-        if (editor && editor.document === this._document) {
-            this.updateDecorations(editor);
-        }
-    }
-
-    /**
-     * Calculates and applies decorations for the currently visible lines.
-     * This method is called by the debounced update or on visible range changes.
-     * @param editor The text editor to apply decorations to.
-     * @param affectedLineNumbers Optional set of line numbers that were affected by a change.
-     *                            If provided, only nodes on these lines will be considered for re-decoration.
-     */
-    private updateDecorations(editor: vscode.TextEditor, affectedLineNumbers?: Set<number>): void {
-        const decorationsToApply = new Map<string, vscode.DecorationOptions[]>();
-        const visibleRanges = editor.visibleRanges;
-        const bufferLines = 20; // Extend visible range by a few lines for smoother scrolling
-
-        // Collect nodes that are both within the extended visible range AND (if provided) in affectedLineNumbers
-        const nodesToProcess: DocumentNode[] = [];
-        this._nodes.forEach(node => {
-            const isVisible = visibleRanges.some(range =>
-                range.start.line <= node.lineNumber && node.lineNumber <= range.end.line + bufferLines
-            );
-            const isAffected = affectedLineNumbers ? affectedLineNumbers.has(node.lineNumber) : true;
-
-            if (isVisible && isAffected) {
-                nodesToProcess.push(node);
-            }
-        });
-
-        // Calculate decorations for these nodes
-        this._decorationRenderer.calculateDecorations(nodesToProcess, decorationsToApply);
-
-        // Apply the calculated decorations
-        this._decorationRenderer.applyDecorations(editor, decorationsToApply);
     }
 
     /**
@@ -148,6 +83,6 @@ export class DocumentModel {
     public dispose(): void {
         this._disposables.forEach(d => d.dispose());
         this._disposables = [];
-        this._decorationRenderer.dispose(); // Dispose decoration types
+        this._decorationManager = undefined; // Clear reference
     }
 }

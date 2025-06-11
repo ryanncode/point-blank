@@ -11,31 +11,29 @@ import { unfocusModeCommand } from './commands/unfocusMode';
 import { handleEnterKeyCommand } from './commands/handleEnterKey';
 import { expandTemplateCommand } from './commands/expandTemplate';
 import { TemplateService } from './templates/templateService';
-import { DocumentModel } from './document/documentModel'; // New import
+import { DocumentModel } from './document/documentModel';
+import { DecorationManager } from './decorations/decorationManager'; // New import
 
 /**
  * Activates the Point Blank extension.
  * This function is called when the extension is activated, which is determined by the
  * `activationEvents` in `package.json`.
  *
- * It initializes the decoration applier and folding range provider, and registers
+ * It initializes the decoration manager and folding range provider, and registers
  * necessary event listeners to update decorations and folding ranges
  * when the active editor changes or the document content is modified.
  *
  * @param context The extension context provided by VS Code.
  */
-const documentModels = new Map<string, DocumentModel>(); // Map to hold DocumentModel instances per document
-
 export function activate(context: vscode.ExtensionContext): void {
     const extensionState = ExtensionState.getInstance();
     const configuration = Configuration.getInstance();
     const templateService = TemplateService.getInstance();
+    const decorationManager = new DecorationManager(); // Instantiate DecorationManager
 
     // Initialize decorations based on current configuration
     configuration.initializeDecorationTypes();
-
-    // Set initial active editor
-    extensionState.setActiveEditor(vscode.window.activeTextEditor);
+    decorationManager.initialize(); // Initialize DecorationManager after types are set
 
     // Register Focus Mode (Hoisting) command
     context.subscriptions.push(vscode.commands.registerCommand('pointblank.focusMode', () => focusModeCommand(extensionState)));
@@ -49,25 +47,31 @@ export function activate(context: vscode.ExtensionContext): void {
     // Register the new template expansion command
     context.subscriptions.push(vscode.commands.registerCommand('pointblank.expandTemplate', expandTemplateCommand));
 
-    // Initialize DocumentModel for the active editor if it exists
-    if (vscode.window.activeTextEditor) {
-        const document = vscode.window.activeTextEditor.document;
-        if (!documentModels.has(document.uri.toString())) {
-            documentModels.set(document.uri.toString(), new DocumentModel(document));
+    // Initialize DocumentModel for all currently open text documents
+    vscode.workspace.textDocuments.forEach(document => {
+        if (document.uri.scheme === 'file' || document.uri.scheme === 'untitled') {
+            const model = new DocumentModel(document);
+            extensionState.addDocumentModel(document.uri.toString(), model);
+            model.setDecorationManager(decorationManager); // Link DocumentModel to DecorationManager
         }
-    }
+    });
+
+    // Listen for new text documents being opened
+    context.subscriptions.push(vscode.workspace.onDidOpenTextDocument(document => {
+        if (document.uri.scheme === 'file' || document.uri.scheme === 'untitled') {
+            const model = new DocumentModel(document);
+            extensionState.addDocumentModel(document.uri.toString(), model);
+            model.setDecorationManager(decorationManager); // Link DocumentModel to DecorationManager
+        }
+    }));
 
     // Listen for configuration changes to re-initialize decorations
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(async event => {
         if (event.affectsConfiguration('pointblank')) {
             configuration.initializeDecorationTypes();
-            // Re-trigger decoration updates for all active document models
-            for (const model of documentModels.values()) {
-                const editor = vscode.window.visibleTextEditors.find(e => e.document === model.document);
-                if (editor) {
-                    // Force a re-render by re-parsing and updating decorations
-                    model['parseAndRender'](editor.document);
-                }
+            // Re-trigger decoration updates via the DecorationManager
+            if (vscode.window.activeTextEditor) {
+                decorationManager.notifyDocumentNodesChanged(vscode.window.activeTextEditor);
             }
         }
     }));
@@ -82,58 +86,28 @@ export function activate(context: vscode.ExtensionContext): void {
     );
 
     // Listen for changes in the active text editor.
-    // When the active editor changes, update the decoration applier's editor
-    // and trigger a decoration update for the new editor.
+    // The DecorationManager handles setting its active editor internally.
     vscode.window.onDidChangeActiveTextEditor(editor => {
         extensionState.setActiveEditor(editor);
-        if (editor) {
-            // Ensure a DocumentModel exists for the newly active editor
-            if (!documentModels.has(editor.document.uri.toString())) {
-                documentModels.set(editor.document.uri.toString(), new DocumentModel(editor.document));
-            }
-        }
+        decorationManager.setActiveEditor(editor);
     }, null, context.subscriptions);
-
-    // Listen for text document changes
-    context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(event => {
-        const documentModel = documentModels.get(event.document.uri.toString());
-        if (documentModel) {
-            // DocumentModel handles its own internal parsing and decoration updates
-            // No direct action needed here other than the template expansion logic
-            const change = event.contentChanges[0];
-            if (change && change.text === ' ' && change.rangeLength === 0) {
-                const line = event.document.lineAt(change.range.start.line);
-                const textBeforeSpace = line.text.substring(0, change.range.start.character);
-                const match = textBeforeSpace.match(/^\s*[-*]?\s*@(\w+)$/);
-                if (match) {
-                    const typeName = match[1];
-                    vscode.commands.executeCommand('pointblank.expandTemplate', typeName);
-                }
-            }
-        }
-    }));
 
     // Listen for document close events to dispose of DocumentModel instances
     context.subscriptions.push(vscode.workspace.onDidCloseTextDocument(document => {
-        const model = documentModels.get(document.uri.toString());
-        if (model) {
-            model.dispose();
-            documentModels.delete(document.uri.toString());
-        }
+        extensionState.removeDocumentModel(document.uri.toString());
     }));
+
+    // Add DecorationManager to disposables
+    context.subscriptions.push(decorationManager);
 }
 
 /**
  * Deactivates the Point Blank extension.
  * This function is called when the extension is deactivated.
- * It disposes of all active decoration types to prevent memory leaks.
+ * It disposes of all active decoration types and DocumentModel instances to prevent memory leaks.
  */
 export function deactivate(): void {
-    // Dispose all DocumentModel instances
-    for (const model of documentModels.values()) {
-        model.dispose();
-    }
-    documentModels.clear();
     ExtensionState.getInstance().disposeDecorationTypes();
+    // The DecorationManager is disposed via context.subscriptions
 }
 

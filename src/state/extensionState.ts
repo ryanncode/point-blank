@@ -1,8 +1,9 @@
 import * as vscode from 'vscode';
+import { DocumentModel } from '../document/documentModel'; // Import DocumentModel
 
 /**
- * Manages the global state of the Point Blank extension, including the active text editor
- * and the VS Code decoration types used for visual enhancements.
+ * Manages the global state of the Point Blank extension, including the active text editor,
+ * the VS Code decoration types, and a map of DocumentModel instances for open documents.
  * This class is implemented as a singleton to ensure a single, consistent state
  * across the extension's lifecycle.
  */
@@ -10,6 +11,7 @@ export class ExtensionState {
     private static _instance: ExtensionState;
     private _activeEditor: vscode.TextEditor | undefined;
     private _decorationTypes: { [key: string]: vscode.TextEditorDecorationType } = {};
+    private _documentModels: Map<string, DocumentModel> = new Map(); // Map to hold DocumentModel instances
 
     private constructor() {
         // Private constructor to prevent direct instantiation
@@ -67,7 +69,37 @@ export class ExtensionState {
     }
 
     /**
-     * Disposes of all managed decoration types.
+     * Adds a DocumentModel instance to the state.
+     * @param uri The URI string of the document.
+     * @param model The DocumentModel instance.
+     */
+    public addDocumentModel(uri: string, model: DocumentModel): void {
+        this._documentModels.set(uri, model);
+    }
+
+    /**
+     * Retrieves a DocumentModel instance by its URI.
+     * @param uri The URI string of the document.
+     * @returns The DocumentModel instance or undefined if not found.
+     */
+    public getDocumentModel(uri: string): DocumentModel | undefined {
+        return this._documentModels.get(uri);
+    }
+
+    /**
+     * Removes and disposes a DocumentModel instance from the state.
+     * @param uri The URI string of the document to remove.
+     */
+    public removeDocumentModel(uri: string): void {
+        const model = this._documentModels.get(uri);
+        if (model) {
+            model.dispose();
+            this._documentModels.delete(uri);
+        }
+    }
+
+    /**
+     * Disposes of all managed decoration types and DocumentModel instances.
      * This should be called during extension deactivation to clean up resources.
      */
     public disposeDecorationTypes(): void {
@@ -77,5 +109,11 @@ export class ExtensionState {
             }
         }
         this._decorationTypes = {}; // Reset the map
+
+        // Dispose all DocumentModel instances
+        for (const model of this._documentModels.values()) {
+            model.dispose();
+        }
+        this._documentModels.clear();
     }
 }
