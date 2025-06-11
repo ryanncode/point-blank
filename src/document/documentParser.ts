@@ -37,8 +37,7 @@ export class DocumentParser {
             const linesDeleted = endLine - startLine + 1;
             const newLinesCount = change.text.split('\n').length;
 
-            const deletedNodes = nodes.splice(startLine, linesDeleted);
-            changedNodes.push(...deletedNodes);
+            nodes.splice(startLine, linesDeleted); // Remove deleted nodes from the main array
 
             const newNodes: DocumentNode[] = [];
             for (let i = 0; i < newLinesCount; i++) {
@@ -47,8 +46,23 @@ export class DocumentParser {
                 const newNode = this.parseLine(line, lineIndex);
                 newNodes.push(newNode);
             }
-            nodes.splice(startLine, 0, ...newNodes);
-            changedNodes.push(...newNodes);
+            nodes.splice(startLine, 0, ...newNodes); // Insert new nodes into the main array
+
+            // Determine which nodes actually changed for decoration updates
+            // For a simple newline insertion, the original line and the new line are the ones to re-evaluate.
+            // For other changes, all new nodes are considered changed.
+            if (event.contentChanges.length === 1 && change.text.endsWith('\n') && change.rangeLength === 0) {
+                // This is a simple newline insertion.
+                // The line where Enter was pressed (startLine) might have changed its content (e.g., auto-bullet).
+                // The newly inserted line (startLine + 1) is also new.
+                // We need to re-parse the original line to get its updated DocumentNode.
+                const originalLineNode = this.parseLine(document.lineAt(startLine), startLine);
+                changedNodes.push(originalLineNode);
+                changedNodes.push(newNodes[0]); // The single new line
+            } else {
+                // For other types of changes, all newly inserted/modified nodes are considered changed.
+                changedNodes.push(...newNodes);
+            }
         }
 
         this._inCodeBlock = false;
@@ -129,7 +143,8 @@ export class DocumentParser {
             if (node.trimmedText.startsWith('```')) {
                 this._inCodeBlock = !this._inCodeBlock;
             }
-            node.isCodeBlockDelimiter = this._inCodeBlock; // This needs to be set based on the *current* state
+            // Set isCodeBlockDelimiter based on the state *after* processing the current line's delimiter
+            node.isCodeBlockDelimiter = node.trimmedText.startsWith('```');
 
             // Determine parent for key-value lines and typed nodes
             if (node.isKeyValue) {

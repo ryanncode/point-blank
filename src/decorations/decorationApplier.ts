@@ -68,14 +68,74 @@ export class DecorationApplier {
         }
 
         // Remove old decorations for the lines being updated
-        const linesToUpdate = nodesToUpdate.map(n => n.lineNumber);
+        // Collect all unique line numbers that need to be updated
+        const linesToUpdate = new Set<number>();
+        nodesToUpdate.forEach(node => linesToUpdate.add(node.lineNumber));
+
+        // Clear all decorations for the lines being updated across all decoration types
         for (const type of this._decorations.keys()) {
             const existingDecorations = this._decorations.get(type) || [];
-            const newDecorations = existingDecorations.filter(d => !linesToUpdate.includes(d.range.start.line));
-            this._decorations.set(type, newDecorations);
+            const filteredDecorations = existingDecorations.filter(d => !linesToUpdate.has(d.range.start.line));
+            this._decorations.set(type, filteredDecorations);
         }
 
         this.calculateDecorations(nodesToUpdate);
+        this.applyAllDecorations(activeEditor);
+    }
+
+    /**
+     * Updates decorations specifically for a newline insertion, shifting existing decorations
+     * and recalculating only for the affected lines.
+     * @param activeEditor The currently active text editor.
+     * @param insertedLineNumber The line number where the new line was inserted.
+     * @param newNode The DocumentNode for the newly created line.
+     * @param originalLineNode The DocumentNode for the original line that was split.
+     */
+    public updateDecorationsForNewline(
+        activeEditor: vscode.TextEditor,
+        insertedLineNumber: number,
+        newNode: DocumentNode,
+        originalLineNode: DocumentNode
+    ): void {
+        if (!activeEditor) {
+            return;
+        }
+
+        // Shift existing decorations down by one line for all lines below the insertion point
+        for (const type of this._decorations.keys()) {
+            const existingDecorations = this._decorations.get(type) || [];
+            const shiftedDecorations: vscode.DecorationOptions[] = [];
+
+            for (const decoration of existingDecorations) {
+                if (decoration.range.start.line >= insertedLineNumber) {
+                    // Shift decoration down by one line
+                    shiftedDecorations.push({
+                        range: new vscode.Range(
+                            decoration.range.start.line + 1,
+                            decoration.range.start.character,
+                            decoration.range.end.line + 1,
+                            decoration.range.end.character
+                        )
+                    });
+                } else {
+                    shiftedDecorations.push(decoration);
+                }
+            }
+            this._decorations.set(type, shiftedDecorations);
+        }
+
+        // Clear decorations for the original line and the new line, then recalculate them
+        const linesToRecalculate = new Set<number>();
+        linesToRecalculate.add(originalLineNode.lineNumber);
+        linesToRecalculate.add(newNode.lineNumber);
+
+        for (const type of this._decorations.keys()) {
+            const existingDecorations = this._decorations.get(type) || [];
+            const filteredDecorations = existingDecorations.filter(d => !linesToRecalculate.has(d.range.start.line));
+            this._decorations.set(type, filteredDecorations);
+        }
+
+        this.calculateDecorations([originalLineNode, newNode]);
         this.applyAllDecorations(activeEditor);
     }
 
@@ -108,17 +168,17 @@ export class DecorationApplier {
                 continue;
             }
 
-            if (firstChar === '*' && node.text.charAt(firstCharIndex + 1) === ' ') {
+            if (firstChar === '*' && /\s/.test(node.text.charAt(firstCharIndex + 1))) {
                 const range = new vscode.Range(node.lineNumber, firstCharIndex, node.lineNumber, firstCharIndex + 1);
                 this._decorations.get('starBulletDecorationType')!.push({ range });
                 continue;
             }
-            if (firstChar === '+' && node.text.charAt(firstCharIndex + 1) === ' ') {
+            if (firstChar === '+' && /\s/.test(node.text.charAt(firstCharIndex + 1))) {
                 const range = new vscode.Range(node.lineNumber, firstCharIndex, node.lineNumber, firstCharIndex + 1);
                 this._decorations.get('plusBulletDecorationType')!.push({ range });
                 continue;
             }
-            if (firstChar === '-' && node.text.charAt(firstCharIndex + 1) === ' ') {
+            if (firstChar === '-' && /\s/.test(node.text.charAt(firstCharIndex + 1))) {
                 const range = new vscode.Range(node.lineNumber, firstCharIndex, node.lineNumber, firstCharIndex + 1);
                 this._decorations.get('minusBulletDecorationType')!.push({ range });
                 continue;
