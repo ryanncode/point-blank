@@ -7,6 +7,7 @@ import { IndentFoldingRangeProvider } from './foldingProvider';
 import { DecorationApplier } from './decorations/decorationApplier';
 import { initializeDecorations } from './constants';
 import { debounce } from './utils/debounce';
+import { FoldingUtils } from './utils/foldingUtils';
 
 /**
  * Activates the Point Blank extension.
@@ -22,6 +23,45 @@ import { debounce } from './utils/debounce';
 export function activate(context: vscode.ExtensionContext): void {
     // Initialize decorations based on current configuration
     initializeDecorations();
+
+    // Register Focus Mode (Hoisting) command
+    context.subscriptions.push(vscode.commands.registerCommand('pointblank.focusMode', async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) {
+            vscode.window.showInformationMessage('No active editor found.');
+            return;
+        }
+
+        const document = editor.document;
+        const currentLine = editor.selection.active.line;
+
+        const allFoldingRanges = await FoldingUtils.getAllFoldingRanges(document);
+        const targetRange = FoldingUtils.findNearestFoldingBlock(document, currentLine, allFoldingRanges);
+
+        if (targetRange) {
+            // First, unfold everything to ensure a clean state.
+            await vscode.commands.executeCommand('editor.unfoldAll');
+
+            // Then, fold all ranges that are not part of the target's lineage (not ancestors or descendants).
+            // This leaves a clear "path" to the focused block.
+            for (const range of allFoldingRanges) {
+                const isAncestor = range.start <= targetRange.start && range.end >= targetRange.end;
+                const isDescendant = range.start >= targetRange.start && range.end <= targetRange.end;
+
+                // We only want to fold ranges that are not in the direct line of the target.
+                if (!isAncestor && !isDescendant) {
+                    await vscode.commands.executeCommand('editor.fold', { selectionLines: [range.start] });
+                }
+            }
+        } else {
+            vscode.window.showInformationMessage('No folding block found at the current line.');
+        }
+    }));
+
+    // Register Unfocus command
+    context.subscriptions.push(vscode.commands.registerCommand('pointblank.unfocusMode', async () => {
+        await vscode.commands.executeCommand('editor.unfoldAll');
+    }));
 
     let activeEditor = vscode.window.activeTextEditor;
     const decorationApplier = new DecorationApplier(activeEditor);

@@ -15,7 +15,30 @@
   ],
   "main": "./dist/extension.js",
   "contributes": {
-    "commands": [],
+    "commands": [
+      {
+        "command": "pointblank.focusMode",
+        "title": "Point Blank: Focus Mode (Hoisting)"
+      },
+      {
+        "command": "pointblank.unfocusMode",
+        "title": "Point Blank: Unfocus"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "pointblank.focusMode",
+        "key": "alt+f",
+        "mac": "alt+f",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "pointblank.unfocusMode",
+        "key": "alt+u",
+        "mac": "alt+u",
+        "when": "editorTextFocus"
+      }
+    ],
     "configuration": {
       "title": "Point Blank",
       "properties": {

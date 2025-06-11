@@ -25,28 +25,46 @@ export class IndentFoldingRangeProvider implements vscode.FoldingRangeProvider {
         // Stack to keep track of open folding blocks: { indent: indentation level, startLine: line number }
         const stack: { indent: number; startLine: number }[] = [];
 
+        // Helper to get effective indentation, considering markdown list items
+        const getEffectiveIndent = (line: vscode.TextLine, document: vscode.TextDocument): number => {
+            const actualIndent = line.firstNonWhitespaceCharacterIndex;
+            // For markdown files, treat list items as having an increased effective indent
+            if (document.languageId === 'markdown') {
+                const text = line.text.trimStart();
+                // Check for common list item markers: *, -, + followed by a space
+                if (/^(\*|\-|\+)\s/.test(text)) {
+                    // Artificially increase indent to make list items foldable
+                    return actualIndent + 2;
+                }
+            }
+            return actualIndent;
+        };
+
         for (let i = 0; i < document.lineCount; i++) {
             const line = document.lineAt(i);
             if (line.isEmptyOrWhitespace) {
                 continue;
             }
 
-            const currentIndent = line.firstNonWhitespaceCharacterIndex;
+            const currentEffectiveIndent = getEffectiveIndent(line, document);
 
-            // Pop from stack: If the current line's indent is less than or equal to the
+            // Pop from stack: If the current line's effective indent is less than or equal to the
             // indent of the last item on the stack, it means we've finished a folding block.
-            while (stack.length > 0 && currentIndent <= stack[stack.length - 1].indent) {
+            while (stack.length > 0 && currentEffectiveIndent <= stack[stack.length - 1].indent) {
                 const top = stack.pop();
                 if (top && i > top.startLine) { // Ensure a valid range (start line is before current line)
                     ranges.push(new vscode.FoldingRange(top.startLine, i - 1));
                 }
             }
 
-            // Push to stack: If the next line is more indented, it indicates the start of a new folding range.
+            // Push to stack: If the next line is more effectively indented, it indicates the start of a new folding range.
             if (i + 1 < document.lineCount) {
                 const nextLine = document.lineAt(i + 1);
-                if (!nextLine.isEmptyOrWhitespace && nextLine.firstNonWhitespaceCharacterIndex > currentIndent) {
-                    stack.push({ indent: currentIndent, startLine: i });
+                if (!nextLine.isEmptyOrWhitespace) {
+                    const nextEffectiveIndent = getEffectiveIndent(nextLine, document);
+                    if (nextEffectiveIndent > currentEffectiveIndent) {
+                        stack.push({ indent: currentEffectiveIndent, startLine: i });
+                    }
                 }
             }
         }
