@@ -55,74 +55,77 @@ export class DecorationApplier {
 
         let inCodeBlock = false; // State to track if we are inside a fenced code block (e.g., ```)
 
-        for (let i = 0; i < document.lineCount; i++) {
-            const line = document.lineAt(i);
-            const text = line.text.trim();
+        // Iterate only over visible ranges to avoid applying decorations to folded lines.
+        for (const visibleRange of this.activeEditor.visibleRanges) {
+            for (let i = visibleRange.start.line; i <= visibleRange.end.line; i++) {
+                const line = document.lineAt(i);
+                const text = line.text.trim();
 
-            // Toggle `inCodeBlock` state for fenced code block delimiters (e.g., ```).
-            if (text.startsWith('```')) {
-                inCodeBlock = !inCodeBlock;
-                continue; // Exclude the delimiter line itself from bullet decoration.
-            }
+                // Toggle `inCodeBlock` state for fenced code block delimiters (e.g., ```).
+                if (text.startsWith('```')) {
+                    inCodeBlock = !inCodeBlock;
+                    continue; // Exclude the delimiter line itself from bullet decoration.
+                }
 
-            // Exclude lines that are inside a fenced code block.
-            if (inCodeBlock) {
-                continue;
-            }
+                // Exclude lines that are inside a fenced code block.
+                if (inCodeBlock) {
+                    continue;
+                }
 
-            // Exclude empty or whitespace-only lines.
-            if (line.isEmptyOrWhitespace) {
-                continue;
-            }
+                // Exclude empty or whitespace-only lines.
+                if (line.isEmptyOrWhitespace) {
+                    continue;
+                }
 
-            // Exclude other types of lines (e.g., Markdown headers, horizontal rules)
-            // using the helper function.
-            if (isExcludedLine(line)) {
-                continue;
-            }
+                // Exclude other types of lines (e.g., Markdown headers, horizontal rules)
+                // using the helper function.
+                if (isExcludedLine(line)) {
+                    continue;
+                }
 
-            const firstCharIndex = line.firstNonWhitespaceCharacterIndex;
-            const firstChar = line.text.charAt(firstCharIndex);
+                const firstCharIndex = line.firstNonWhitespaceCharacterIndex;
+                const firstChar = line.text.charAt(firstCharIndex);
 
-            // Check for blockquote prefix (>) and apply specific decoration.
-            if (firstChar === '>' && line.text.charAt(firstCharIndex + 1) === ' ') {
-                const range = new vscode.Range(i, firstCharIndex, i, firstCharIndex + 1);
-                blockquoteDecorations.push({ range });
-                continue;
-            }
+                // Check for blockquote prefix (>) and apply specific decoration.
+                if (firstChar === '>' && line.text.charAt(firstCharIndex + 1) === ' ') {
+                    const range = new vscode.Range(i, firstCharIndex, i, firstCharIndex + 1);
+                    blockquoteDecorations.push({ range });
+                    continue;
+                }
 
-            // Check for custom bullet points (*, +, -) and apply specific decoration.
-            // These checks ensure that the character is followed by a space to distinguish
-            // them from other uses of *, +, or -.
-            if (firstChar === '*' && line.text.charAt(firstCharIndex + 1) === ' ') {
-                const range = new vscode.Range(i, firstCharIndex, i, firstCharIndex + 1);
-                starBulletDecorations.push({ range });
-                continue;
-            }
-            if (firstChar === '+' && line.text.charAt(firstCharIndex + 1) === ' ') {
-                const range = new vscode.Range(i, firstCharIndex, i, firstCharIndex + 1);
-                plusBulletDecorations.push({ range });
-                continue;
-            }
-            if (firstChar === '-' && line.text.charAt(firstCharIndex + 1) === ' ') {
-                const range = new vscode.Range(i, firstCharIndex, i, firstCharIndex + 1);
-                minusBulletDecorations.push({ range });
-                continue;
-            }
+                // Check for custom bullet points (*, +, -) and apply specific decoration.
+                // These checks ensure that the character is followed by a space to distinguish
+                // them from other uses of *, +, or -.
+                if (firstChar === '*' && line.text.charAt(firstCharIndex + 1) === ' ') {
+                    const range = new vscode.Range(i, firstCharIndex, i, firstCharIndex + 1);
+                    starBulletDecorations.push({ range });
+                    continue;
+                }
+                if (firstChar === '+' && line.text.charAt(firstCharIndex + 1) === ' ') {
+                    const range = new vscode.Range(i, firstCharIndex, i, firstCharIndex + 1);
+                    plusBulletDecorations.push({ range });
+                    continue;
+                }
+                if (firstChar === '-' && line.text.charAt(firstCharIndex + 1) === ' ') {
+                    const range = new vscode.Range(i, firstCharIndex, i, firstCharIndex + 1);
+                    minusBulletDecorations.push({ range });
+                    continue;
+                }
 
-            // Check for numbered lines (e.g., "1. ", "2) ", etc.) and apply specific decoration.
-            const numberedMatch = text.match(/^(\d+[\.\)])\s*/);
-            if (numberedMatch) {
-                const range = new vscode.Range(i, firstCharIndex, i, firstCharIndex + numberedMatch[1].length);
-                numberedBulletDecorations.push({ range });
-                continue;
-            }
+                // Check for numbered lines (e.g., "1. ", "2) ", etc.) and apply specific decoration.
+                const numberedMatch = text.match(/^(\d+[\.\)])\s*/);
+                if (numberedMatch) {
+                    const range = new vscode.Range(i, firstCharIndex, i, firstCharIndex + numberedMatch[1].length);
+                    numberedBulletDecorations.push({ range });
+                    continue;
+                }
 
-            // Apply the default bullet decoration to all other non-excluded lines.
-            // The decoration is applied to a zero-width range at the first non-whitespace character,
-            // allowing the `before` content (the bullet character) to be inserted.
-            const range = new vscode.Range(i, firstCharIndex, i, firstCharIndex);
-            bulletDecorations.push({ range });
+                // Apply the default bullet decoration to all other non-excluded lines.
+                // The decoration is applied to a zero-width range at the first non-whitespace character,
+                // allowing the `before` content (the bullet character) to be inserted.
+                const range = new vscode.Range(i, firstCharIndex, i, firstCharIndex);
+                bulletDecorations.push({ range });
+            }
         }
 
         // Apply all collected decorations to the active editor.
