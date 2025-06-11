@@ -80,7 +80,7 @@ export class DocumentModel {
         }
 
         // Perform incremental parse
-        const { updatedNodes, affectedLineNumbers } = this._parser.incrementalParse(this._document, event, this._nodes);
+        const { updatedNodes, affectedLineNumbers } = this._parser.incrementalParse(this._document);
         this._nodes = updatedNodes; // Update the model's nodes with the incrementally parsed ones
 
         const activeEditor = vscode.window.activeTextEditor;

@@ -106,65 +106,26 @@ public fullParse(document: vscode.TextDocument): DocumentNode[] {
      * @returns An object containing the updated array of `DocumentNode`s and a set of affected line numbers.
      */
     public incrementalParse(
-        document: vscode.TextDocument,
-        event: vscode.TextDocumentChangeEvent,
-        oldNodes: DocumentNode[]
+        document: vscode.TextDocument
     ): { updatedNodes: DocumentNode[], affectedLineNumbers: Set<number> } {
+        // STRATEGIC DECISION: Full Re-parse for Stability
+        // After multiple failed attempts to implement a reliable incremental parser
+        // that could handle all edge cases of structural changes (especially indentation),
+        // we have reverted to a full re-parse on every document change.
+        //
+        // This approach guarantees correctness and prevents the rendering errors
+        // that were blocking progress on other features (Phases 4, 5, 6).
+        // While this is not performant for large documents, it provides a stable
+        // foundation to build upon.
+        //
+        // The performance optimization of a true incremental parser (Phase 3)
+        // is postponed and will be revisited as a separate, dedicated epic of work.
+
         const affectedLineNumbers = new Set<number>();
-
-        let changeStartLine = event.contentChanges.length > 0 ? event.contentChanges[0].range.start.line : 0;
-        let changeEndLine = event.contentChanges.length > 0 ? event.contentChanges[0].range.end.line : document.lineCount - 1;
-        const linesRemoved = event.contentChanges.length > 0 ? event.contentChanges[0].range.end.line - event.contentChanges[0].range.start.line : 0;
-        const linesAdded = event.contentChanges.length > 0 ? event.contentChanges[0].text.split('\n').length - 1 : 0;
-        const deltaLines = linesAdded - linesRemoved;
-
-        // Determine the effective start and end lines for re-parsing
-        // This is where the "Smart Structural Analysis" comes in.
-        // For now, we'll still re-parse a larger section to ensure correctness,
-        // but we'll refine this in later phases.
-
-        // Start from the beginning of the document to correctly re-evaluate parentage and code blocks
-        let reparseStartLine = 0;
-        let reparseEndLine = document.lineCount - 1;
-
-        // Re-parse the affected lines and update the nodes array
-        const newNodes: DocumentNode[] = [];
-        this._inCodeBlock = false; // Reset code block state for re-parsing
-
-        for (let i = 0; i < document.lineCount; i++) {
-            const line = document.lineAt(i);
-            const node = this.parseLine(line, i);
-
-            // Update code block state
-            if (node.trimmedText.startsWith('```')) {
-                this._inCodeBlock = !this._inCodeBlock;
-            }
-            node.isCodeBlockDelimiter = node.trimmedText.startsWith('```');
-
-            // Determine parent for key-value lines and typed nodes
-            // This logic needs to be applied during incremental parse as well
-            let currentParentLineNumber: number | undefined = undefined;
-            if (i > 0 && newNodes[i - 1]) {
-                currentParentLineNumber = newNodes[i - 1].parentLineNumber; // Inherit from previous node
-                if (!newNodes[i - 1].isKeyValue && !newNodes[i - 1].line.isEmptyOrWhitespace && !newNodes[i - 1].isCodeBlockDelimiter && !newNodes[i - 1].isExcluded) {
-                    currentParentLineNumber = newNodes[i - 1].lineNumber;
-                }
-            }
-
-            if (node.isKeyValue) {
-                node.parentLineNumber = currentParentLineNumber;
-            } else if (!line.isEmptyOrWhitespace && !node.isCodeBlockDelimiter && !node.isExcluded) {
-                node.parentLineNumber = i; // This node is a new parent
-            } else {
-                node.parentLineNumber = currentParentLineNumber; // Inherit parent if not a new parent
-            }
-
-            newNodes.push(node);
+        const newNodes = this.fullParse(document);
+        for (let i = 0; i < newNodes.length; i++) {
             affectedLineNumbers.add(i);
         }
-
-        // For Phase 2, we are still doing a full re-parse to ensure correctness of parentage.
-        // The optimization will come in Phase 3.
         return { updatedNodes: newNodes, affectedLineNumbers };
     }
 }
