@@ -36,6 +36,14 @@ export class Configuration {
     }
 
     /**
+     * Retrieves the configured debounce delay for document and visible range changes.
+     * @returns The debounce delay in milliseconds.
+     */
+    public getDebounceDelay(): number {
+        return this.getConfiguration().get<number>('debounceDelay') || 150;
+    }
+
+    /**
      * Initializes or re-initializes all VS Code decoration types based on the current
      * extension configuration. Existing decoration types are disposed to prevent memory leaks.
      * This method should be called on extension activation and whenever configuration changes.

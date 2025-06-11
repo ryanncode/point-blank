@@ -37,16 +37,15 @@ export class DecorationApplier {
         const keyValueDecorations: vscode.DecorationOptions[] = [];
         const typedNodeDecorations: vscode.DecorationOptions[] = [];
 
-        // Iterate through parsed nodes
-        for (const node of parsedNodes) {
-            // Only apply decorations to visible ranges
-            const isLineVisible = activeEditor.visibleRanges.some(range =>
+        // Filter parsed nodes to only include those within visible ranges
+        const visibleNodes = parsedNodes.filter(node =>
+            activeEditor.visibleRanges.some(range =>
                 range.start.line <= node.lineNumber && node.lineNumber <= range.end.line
-            );
+            )
+        );
 
-            if (!isLineVisible) {
-                continue;
-            }
+        // Iterate through visible nodes
+        for (const node of visibleNodes) {
 
             // Skip lines that are part of a code block, or are delimiters, or are excluded, or are empty
             if (node.isCodeBlockDelimiter || node.isExcluded || node.line.isEmptyOrWhitespace) {

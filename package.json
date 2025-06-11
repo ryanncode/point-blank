@@ -88,6 +88,11 @@
             "Book": ".vscode/templates/book.md",
             "Person": ".vscode/templates/person.md"
           }
+        },
+        "pointblank.debounceDelay": {
+          "type": "number",
+          "default": 150,
+          "description": "The debounce delay in milliseconds for document and visible range changes. Increase for better performance on large files, decrease for more responsiveness."
         }
       }
     }

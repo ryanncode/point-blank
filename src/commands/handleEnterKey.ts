@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { FoldingUtils } from '../folding/foldingUtils';
+import { FoldingCache } from '../folding/foldingCache'; // Import FoldingCache
 
 export async function handleEnterKeyCommand() {
     const editor = vscode.window.activeTextEditor;
@@ -9,9 +10,18 @@ export async function handleEnterKeyCommand() {
 
     const document = editor.document;
     const position = editor.selection.active;
+    const foldingCache = FoldingCache.getInstance();
 
-    // Get all folding ranges
-    const allRanges = await FoldingUtils.getAllFoldingRanges(document);
+    let allRanges = foldingCache.getCache(document);
+
+    if (!allRanges) {
+        // If cache is stale or empty, compute and update cache
+        allRanges = await FoldingUtils.getAllFoldingRanges(document);
+        if (allRanges) {
+            foldingCache.setCache(document, allRanges);
+        }
+    }
+
     if (!allRanges || allRanges.length === 0) {
         // If no folding ranges, execute default Enter key action
         await vscode.commands.executeCommand('type', { text: '\n' });

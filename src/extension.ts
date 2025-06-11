@@ -54,7 +54,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
     // Initial update of decorations if an editor is already active.
     if (extensionState.activeEditor) {
-        const parsedNodes = documentParser.parse(extensionState.activeEditor.document);
+        const parsedNodes = documentParser.parse(extensionState.activeEditor.document); // Initial full parse
         decorationApplier.updateDecorations(extensionState.activeEditor, parsedNodes);
     }
 
@@ -64,7 +64,7 @@ export function activate(context: vscode.ExtensionContext): void {
             configuration.initializeDecorationTypes();
             // Re-apply decorations to the active editor if settings change
             if (extensionState.activeEditor) {
-                const parsedNodes = documentParser.parse(extensionState.activeEditor.document);
+                const parsedNodes = documentParser.parse(extensionState.activeEditor.document); // Full parse on config change
                 decorationApplier.updateDecorations(extensionState.activeEditor, parsedNodes);
             }
         }
@@ -85,7 +85,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.window.onDidChangeActiveTextEditor(editor => {
         extensionState.setActiveEditor(editor);
         if (extensionState.activeEditor) {
-            const parsedNodes = documentParser.parse(extensionState.activeEditor.document);
+            const parsedNodes = documentParser.parse(extensionState.activeEditor.document); // Full parse on active editor change
             decorationApplier.updateDecorations(extensionState.activeEditor, parsedNodes);
         }
     }, null, context.subscriptions);
@@ -93,16 +93,16 @@ export function activate(context: vscode.ExtensionContext): void {
     // Listen for changes in the text document.
     // If the change occurs in the currently active editor's document,
     // trigger a decoration update to reflect the latest content.
-    const debouncedUpdateDecorations = debounce(() => {
+    const debouncedUpdateDecorations = debounce((event?: vscode.TextDocumentChangeEvent) => {
         if (extensionState.activeEditor) {
-            const parsedNodes = documentParser.parse(extensionState.activeEditor.document); // Parse document
+            const parsedNodes = documentParser.parse(extensionState.activeEditor.document, event); // Pass event for incremental parsing
             decorationApplier.updateDecorations(extensionState.activeEditor, parsedNodes); // Pass parsed nodes
         }
-    }, 30); // Debounce time of 30ms
+    }, configuration.getDebounceDelay()); // Use configurable debounce delay
 
     vscode.workspace.onDidChangeTextDocument(event => {
         if (extensionState.activeEditor && event.document === extensionState.activeEditor.document) {
-            debouncedUpdateDecorations();
+            debouncedUpdateDecorations(event);
 
             const editor = extensionState.activeEditor;
             const document = event.document;
@@ -127,6 +127,7 @@ export function activate(context: vscode.ExtensionContext): void {
     // Debounced update for visible range changes (scrolling)
     vscode.window.onDidChangeTextEditorVisibleRanges(event => {
         if (extensionState.activeEditor && event.textEditor === extensionState.activeEditor) {
+            // No event object for visible range changes, so trigger a full parse
             debouncedUpdateDecorations();
         }
     }, null, context.subscriptions);

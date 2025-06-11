@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { isExcludedLine } from '../decorations/lineFilters';
 
 /**
  * Provides folding ranges for text documents based on indentation levels.
@@ -42,7 +43,7 @@ export class IndentFoldingRangeProvider implements vscode.FoldingRangeProvider {
 
         for (let i = 0; i < document.lineCount; i++) {
             const line = document.lineAt(i);
-            if (line.isEmptyOrWhitespace) {
+            if (line.isEmptyOrWhitespace || isExcludedLine(line)) { // Skip empty or excluded lines
                 continue;
             }
 
