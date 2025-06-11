@@ -85,18 +85,8 @@ export class DocumentModel {
 
         const activeEditor = vscode.window.activeTextEditor;
         if (activeEditor && activeEditor.document === this._document) {
-            // Check if the change is on the active line and is a single character insertion/deletion
-            const isSingleCharChangeOnActiveLine = event.contentChanges.length === 1 &&
-                                                   event.contentChanges[0].range.start.line === activeEditor.selection.active.line &&
-                                                   (event.contentChanges[0].text.length === 1 || event.contentChanges[0].rangeLength === 1);
-
-            if (isSingleCharChangeOnActiveLine) {
-                // For immediate feedback on typing, update decorations for the current line directly
-                this.updateDecorations(activeEditor);
-            } else {
-                // For other document changes (e.g., paste, multi-line edit), use debounced update
-                this._debouncedUpdateDecorations(activeEditor);
-            }
+            // Always use the debounced update for document changes.
+            this._debouncedUpdateDecorations(activeEditor);
         }
     }
 
@@ -127,7 +117,7 @@ export class DocumentModel {
     private updateDecorations(editor: vscode.TextEditor): void {
         const decorationsToApply = new Map<string, vscode.DecorationOptions[]>();
         const visibleRanges = editor.visibleRanges;
-        const bufferLines = 5; // Extend visible range by a few lines for smoother scrolling
+        const bufferLines = 20; // Extend visible range by a few lines for smoother scrolling
 
         // Collect all nodes that are within the extended visible range
         const nodesInView: DocumentNode[] = [];
