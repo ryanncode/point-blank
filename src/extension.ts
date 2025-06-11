@@ -94,14 +94,6 @@ export function activate(context: vscode.ExtensionContext): void {
     const debouncedIncrementalUpdate = debounce((event: vscode.TextDocumentChangeEvent) => {
         if (extensionState.activeEditor) {
             const result = documentParser.parse(extensionState.activeEditor.document, event);
-            decorationApplier.updateDecorationsForNodes(extensionState.activeEditor, result.changedNodes);
-        }
-    }, configuration.getDebounceDelay());
-
-    // Immediate update for specific scenarios (e.g., Enter key)
-    const handleImmediateUpdate = (event: vscode.TextDocumentChangeEvent) => {
-        if (extensionState.activeEditor) {
-            const result = documentParser.parse(extensionState.activeEditor.document, event);
             const change = event.contentChanges[0];
 
             if (event.contentChanges.length === 1 && change.text.endsWith('\n') && change.rangeLength === 0) {
@@ -122,13 +114,17 @@ export function activate(context: vscode.ExtensionContext): void {
                 decorationApplier.updateDecorationsForNodes(extensionState.activeEditor, result.changedNodes);
             }
         }
-    };
+    }, configuration.getDebounceDelay());
 
     // Fast debounced update for visible range changes (scrolling)
     const debouncedVisibleRangeUpdate = debounce(() => {
         if (extensionState.activeEditor) {
             const { allNodes } = documentParser.parse(extensionState.activeEditor.document);
-            decorationApplier.updateDecorationsForFullRender(extensionState.activeEditor, allNodes);
+            decorationApplier.updateDecorationsForScrolling(
+                extensionState.activeEditor,
+                allNodes,
+                extensionState.activeEditor.visibleRanges
+            );
         }
     }, 20);
 
@@ -136,12 +132,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.workspace.onDidChangeTextDocument(event => {
         if (extensionState.activeEditor && event.document === extensionState.activeEditor.document) {
             const change = event.contentChanges[0];
-            // Check if the change is a simple newline insertion (e.g., pressing Enter)
-            if (event.contentChanges.length === 1 && change.text.endsWith('\n') && change.rangeLength === 0) {
-                handleImmediateUpdate(event);
-            } else {
-                debouncedIncrementalUpdate(event);
-            }
+            debouncedIncrementalUpdate(event);
 
             // Existing logic for template expansion
             if (change && change.text === ' ' && change.rangeLength === 0) {
