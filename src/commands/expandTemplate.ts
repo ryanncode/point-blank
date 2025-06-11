@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import { TemplateService } from '../templates/templateService';
-import { DocumentParser } from '../document/documentParser';
-import { DecorationApplier } from '../decorations/decorationApplier';
+import { DocumentModel } from '../document/documentModel';
 
 export async function expandTemplateCommand(typeName: string): Promise<void> {
     const editor = vscode.window.activeTextEditor;
@@ -68,8 +67,8 @@ export async function expandTemplateCommand(typeName: string): Promise<void> {
 
     // After the edit is complete, explicitly trigger a re-parse and re-decoration.
     // This ensures the parser sees the *new* text and applies correct decorations.
-    const documentParser = new DocumentParser();
-    const decorationApplier = new DecorationApplier();
-    const { allNodes } = documentParser.parse(document);
-    decorationApplier.updateDecorationsForFullRender(editor, allNodes);
+    const documentModel = (global as any).documentModels.get(document.uri.toString());
+    if (documentModel) {
+        documentModel.parseAndRender(document);
+    }
 }

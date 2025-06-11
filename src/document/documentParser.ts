@@ -7,130 +7,13 @@ export class DocumentParser {
     private _inCodeBlock: boolean = false; // Track code block state across incremental updates
 
     public parse(document: vscode.TextDocument, event?: vscode.TextDocumentChangeEvent): { allNodes: DocumentNode[], changedNodes: DocumentNode[] } {
-        if (!event || this._cachedNodes.length === 0) {
-            const allNodes = this.fullParse(document);
-            return { allNodes, changedNodes: allNodes };
-        }
-
-        const changedNodes: DocumentNode[] = [];
-        let nodes = [...this._cachedNodes];
-        let currentParentLineNumber: number | undefined = undefined;
-        this._inCodeBlock = false;
-
-        for (let i = 0; i < document.lineCount; i++) {
-            const line = document.lineAt(i);
-            const trimmedText = line.text.trim();
-            if (trimmedText.startsWith('```')) {
-                this._inCodeBlock = !this._inCodeBlock;
-            }
-            if (!line.isEmptyOrWhitespace && !this._inCodeBlock && !isExcludedLine(line)) {
-                currentParentLineNumber = i;
-            }
-            if (nodes[i]) {
-                nodes[i].parentLineNumber = currentParentLineNumber;
-            }
-        }
-
-        for (const change of event.contentChanges) {
-            const startLine = change.range.start.line;
-            const endLine = change.range.end.line;
-            const linesDeleted = endLine - startLine + 1;
-            const newLinesCount = change.text.split('\n').length;
-
-            nodes.splice(startLine, linesDeleted); // Remove deleted nodes from the main array
-
-            const newNodes: DocumentNode[] = [];
-            for (let i = 0; i < newLinesCount; i++) {
-                const lineIndex = startLine + i;
-                const line = document.lineAt(lineIndex);
-                const newNode = this.parseLine(line, lineIndex);
-                newNodes.push(newNode);
-            }
-            nodes.splice(startLine, 0, ...newNodes); // Insert new nodes into the main array
-
-            // Determine which nodes actually changed for decoration updates
-            // For a simple newline insertion, the original line and the new line are the ones to re-evaluate.
-            // For other changes, all new nodes are considered changed.
-            if (event.contentChanges.length === 1 && change.text.endsWith('\n') && change.rangeLength === 0) {
-                // This is a simple newline insertion.
-                // The line where Enter was pressed (startLine) might have changed its content (e.g., auto-bullet).
-                // The newly inserted line (startLine + 1) is also new.
-                // We need to re-parse the original line to get its updated DocumentNode.
-                const originalLineNode = this.parseLine(document.lineAt(startLine), startLine);
-                changedNodes.push(originalLineNode);
-                changedNodes.push(newNodes[0]); // The single new line
-            } else {
-                // For other types of changes, all newly inserted/modified nodes are considered changed.
-                changedNodes.push(...newNodes);
-            }
-        }
-
-        this._inCodeBlock = false;
-        currentParentLineNumber = undefined;
-        for (let i = 0; i < nodes.length; i++) {
-            const node = nodes[i];
-            const line = document.lineAt(i);
-            const trimmedText = line.text.trim();
-
-            node.lineNumber = i;
-            node.line = line;
-            node.text = line.text;
-            node.trimmedText = trimmedText;
-            node.indent = line.firstNonWhitespaceCharacterIndex;
-
-            if (trimmedText.startsWith('```')) {
-                this._inCodeBlock = !this._inCodeBlock;
-                node.isCodeBlockDelimiter = true;
-            } else {
-                node.isCodeBlockDelimiter = false;
-            }
-
-            node.isExcluded = isExcludedLine(line);
-
-            const lineTextFromNonWhitespace = line.text.substring(node.indent);
-            const keyValueMatch = lineTextFromNonWhitespace.match(/^(\S+::)\s*(.*)/);
-            if (keyValueMatch) {
-                node.isKeyValue = true;
-                const keyPart = keyValueMatch[1];
-                const valuePart = keyValueMatch[2];
-                const keyRange = new vscode.Range(i, node.indent, i, node.indent + keyPart.length);
-                const fullRange = new vscode.Range(i, 0, i, line.text.length);
-                node.keyValue = {
-                    key: keyPart.slice(0, -2),
-                    value: valuePart,
-                    range: fullRange,
-                    keyRange: keyRange
-                };
-            } else {
-                node.isKeyValue = false;
-                node.keyValue = undefined;
-            }
-
-            const typedNodeMatch = lineTextFromNonWhitespace.match(/^\s*\((.+)\)/);
-            if (typedNodeMatch) {
-                node.isTypedNode = true;
-                node.type = typedNodeMatch[1];
-                const startIndex = node.indent + typedNodeMatch[0].indexOf('(');
-                const endIndex = startIndex + typedNodeMatch[0].length - typedNodeMatch[0].indexOf('(');
-                node.typedNodeRange = new vscode.Range(i, startIndex, i, endIndex);
-            } else {
-                node.isTypedNode = false;
-                node.type = undefined;
-                node.typedNodeRange = undefined;
-            }
-
-            if (node.isKeyValue) {
-                node.parentLineNumber = currentParentLineNumber;
-            } else if (!line.isEmptyOrWhitespace && !node.isCodeBlockDelimiter && !node.isExcluded) {
-                currentParentLineNumber = i;
-            }
-        }
-
-        this._cachedNodes = nodes;
-        return { allNodes: this._cachedNodes, changedNodes: changedNodes };
+        const allNodes = this.fullParse(document);
+        // For now, we consider all nodes as potentially changed to force full re-decoration.
+        // In a future optimization, this could be refined to identify truly changed nodes.
+        return { allNodes, changedNodes: allNodes };
     }
 
-    private fullParse(document: vscode.TextDocument): DocumentNode[] {
+public fullParse(document: vscode.TextDocument): DocumentNode[] {
         const nodes: DocumentNode[] = [];
         let currentParentLineNumber: number | undefined = undefined;
         this._inCodeBlock = false; // Reset for full parse
@@ -217,5 +100,59 @@ export class DocumentParser {
             type: type,
             typedNodeRange: typedNodeRange
         };
+    }
+
+    /**
+     * Performs an incremental parse of the document based on a text document change event.
+     * This method aims to re-parse only the affected lines and their immediate context
+     * to update the document nodes efficiently.
+     * @param document The current `vscode.TextDocument`.
+     * @param event The `vscode.TextDocumentChangeEvent` describing the change.
+     * @param oldNodes The array of `DocumentNode`s before the change.
+     * @returns An object containing the updated array of `DocumentNode`s and a set of affected line numbers.
+     */
+    public incrementalParse(
+        document: vscode.TextDocument,
+        event: vscode.TextDocumentChangeEvent,
+        oldNodes: DocumentNode[]
+    ): { updatedNodes: DocumentNode[], affectedLineNumbers: Set<number> } {
+        const updatedNodes: DocumentNode[] = [...oldNodes];
+        const affectedLineNumbers = new Set<number>();
+
+        // Determine the range of lines affected by the change
+        let startLine = event.contentChanges.length > 0 ? event.contentChanges[0].range.start.line : 0;
+        let endLine = event.contentChanges.length > 0 ? event.contentChanges[0].range.end.line : document.lineCount - 1;
+
+        // Extend the affected range to include potential structural changes (e.g., indentation changes)
+        // For simplicity, we'll re-parse from the start of the document for now,
+        // but this is where more sophisticated incremental parsing logic would go.
+        // A more advanced implementation would track indentation levels and re-parse
+        // only the necessary subtree.
+        startLine = 0; // For now, force full re-parse on change for simplicity and correctness
+
+        // Re-parse the affected lines and update the nodes array
+        const newNodes: DocumentNode[] = [];
+        this._inCodeBlock = false; // Reset code block state for re-parsing
+
+        for (let i = 0; i < document.lineCount; i++) {
+            const line = document.lineAt(i);
+            const node = this.parseLine(line, i);
+
+            // Update code block state
+            if (node.trimmedText.startsWith('```')) {
+                this._inCodeBlock = !this._inCodeBlock;
+            }
+            node.isCodeBlockDelimiter = node.trimmedText.startsWith('```');
+
+            // For now, we're doing a full re-parse, so all nodes are "new"
+            newNodes.push(node);
+            affectedLineNumbers.add(i);
+        }
+
+        // In a true incremental parse, you would merge newNodes into updatedNodes
+        // based on the affected range. For this refactor, we're simplifying by
+        // effectively doing a full re-parse on every change for correctness,
+        // and will optimize incremental parsing later if needed.
+        return { updatedNodes: newNodes, affectedLineNumbers };
     }
 }
