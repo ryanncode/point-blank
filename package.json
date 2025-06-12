@@ -27,6 +27,10 @@
       {
         "command": "pointblank.handleEnterKey",
         "title": "Point Blank: Handle Enter Key"
+      },
+      {
+        "command": "pointblank.quickOpenFile",
+        "title": "Point Blank: Quick Open File from Template"
       }
     ],
     "keybindings": [
@@ -93,6 +97,11 @@
           "type": "number",
           "default": 150,
           "description": "The debounce delay in milliseconds for document and visible range changes. Increase for better performance on large files, decrease for more responsiveness."
+        },
+        "pointblank.newFileDirectory": {
+          "type": "string",
+          "default": ".",
+          "description": "The default directory for new files created via Quick Open. Relative to the workspace root."
         }
       }
     }

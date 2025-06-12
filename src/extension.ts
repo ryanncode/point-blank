@@ -10,6 +10,7 @@ import { focusModeCommand } from './commands/focusMode';
 import { unfocusModeCommand } from './commands/unfocusMode';
 import { handleEnterKeyCommand } from './commands/handleEnterKey';
 import { expandTemplateCommand } from './commands/expandTemplate';
+import { quickOpenFileCommand } from './commands/quickOpenFile';
 import { TemplateService } from './templates/templateService';
 import { DocumentModel } from './document/documentModel';
 import { DecorationManager } from './decorations/decorationManager'; // New import
@@ -49,6 +50,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
     // Register the new template expansion command
     context.subscriptions.push(vscode.commands.registerCommand('pointblank.expandTemplate', expandTemplateCommand));
+
+    // Register the new quick open file from template command
+    context.subscriptions.push(vscode.commands.registerCommand('pointblank.quickOpenFile', quickOpenFileCommand));
 
     // Initialize DocumentModel for all currently open text documents
     vscode.workspace.textDocuments.forEach(document => {

@@ -27,6 +27,10 @@ export class TemplateService {
         this.templatesConfig = config.get('templates') || {};
     }
 
+    public getTemplateNames(): string[] {
+        return Object.keys(this.templatesConfig);
+    }
+
     public async getTemplate(typeName: string): Promise<string | undefined> {
         const templatePathRelative = this.templatesConfig[typeName];
         if (!templatePathRelative) {
