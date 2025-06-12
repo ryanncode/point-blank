@@ -35,6 +35,9 @@ export function activate(context: vscode.ExtensionContext): void {
     configuration.initializeDecorationTypes();
     decorationManager.initialize(); // Initialize DecorationManager after types are set
 
+    // Set initial active editor for ExtensionState
+    extensionState.setActiveEditor(vscode.window.activeTextEditor);
+
     // Register Focus Mode (Hoisting) command
     context.subscriptions.push(vscode.commands.registerCommand('pointblank.focusMode', () => focusModeCommand(extensionState)));
 
@@ -92,7 +95,6 @@ export function activate(context: vscode.ExtensionContext): void {
     // The DecorationManager handles setting its active editor internally.
     vscode.window.onDidChangeActiveTextEditor(editor => {
         extensionState.setActiveEditor(editor);
-        decorationManager.setActiveEditor(editor);
     }, null, context.subscriptions);
 
     // Listen for document close events to dispose of DocumentModel instances

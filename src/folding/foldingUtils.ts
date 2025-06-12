@@ -31,25 +31,14 @@ export class FoldingUtils {
         line: number,
         allRanges: vscode.FoldingRange[]
     ): vscode.FoldingRange | undefined {
-        let bestMatch: vscode.FoldingRange | undefined;
-        let bestRangeSize: number = Infinity; // To find the smallest containing range
-
-        for (const range of allRanges) {
-            // Check if the current line is within the range
-            if (line >= range.start && line <= range.end) {
-                const currentRangeSize = range.end - range.start;
-
-                if (currentRangeSize < bestRangeSize) {
-                    bestMatch = range;
-                    bestRangeSize = currentRangeSize;
-                } else if (currentRangeSize === bestRangeSize) {
-                    // If sizes are equal, pick the one that starts later (more "nearest" geographically)
-                    if (!bestMatch || range.start > bestMatch.start) {
-                        bestMatch = range;
-                    }
-                }
+        let currentLine = line;
+        while (currentLine >= 0) {
+            const range = allRanges.find(r => r.start === currentLine);
+            if (range) {
+                return range;
             }
+            currentLine--;
         }
-        return bestMatch;
+        return undefined;
     }
 }

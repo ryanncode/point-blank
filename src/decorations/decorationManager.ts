@@ -12,7 +12,6 @@ import { debounce } from '../utils/debounce';
 export class DecorationManager {
     private _extensionState: ExtensionState;
     private _decorationTypes: Map<string, vscode.TextEditorDecorationType> = new Map();
-    private _activeEditor: vscode.TextEditor | undefined;
     private _disposables: vscode.Disposable[] = [];
     // Stores the currently applied decorations, categorized by type
     private _currentDecorations: Map<string, vscode.DecorationOptions[]> = new Map();
@@ -33,15 +32,10 @@ export class DecorationManager {
     public initialize(): void {
         this.initializeDecorationTypesInternal();
 
-        // Listen for active editor changes
-        vscode.window.onDidChangeActiveTextEditor(this.onDidChangeActiveTextEditor, this, this._disposables);
         // Listen for selection changes (for cursor positioning)
         vscode.window.onDidChangeTextEditorSelection(this.onDidChangeTextEditorSelection, this, this._disposables);
         // Listen for visible range changes (for viewport-aware rendering)
         vscode.window.onDidChangeTextEditorVisibleRanges(this.onDidChangeTextEditorVisibleRanges, this, this._disposables);
-
-        // Set initial active editor
-        this.setActiveEditor(vscode.window.activeTextEditor);
     }
 
     private initializeDecorationTypesInternal(): void {
@@ -65,20 +59,6 @@ export class DecorationManager {
         }
     }
 
-    public setActiveEditor(editor: vscode.TextEditor | undefined): void {
-        if (this._activeEditor === editor) {
-            return;
-        }
-        this._activeEditor = editor;
-        if (editor) {
-            // When active editor changes, trigger a full re-render
-            const documentModel = this._extensionState.getDocumentModel(editor.document.uri.toString());
-            if (documentModel) {
-                this.updateDecorations(documentModel.documentTree, new vscode.Range(0, 0, editor.document.lineCount, 0));
-            }
-        }
-    }
-
     /**
      * Main entry point for updating decorations. This method should be called
      * by DocumentModel whenever the document tree changes.
@@ -88,22 +68,20 @@ export class DecorationManager {
      * @param visibleRanges Optional: The currently visible ranges in the editor. If not provided, current editor's visible ranges will be used.
      */
     public updateDecorations(tree: DocumentTree, changedRange: vscode.Range, visibleRanges?: readonly vscode.Range[]): void {
-        if (!this._activeEditor || this._activeEditor.document.uri.toString() !== tree.document.uri.toString()) {
+        const activeEditor = this._extensionState.activeEditor;
+        if (!activeEditor || activeEditor.document.uri.toString() !== tree.document.uri.toString()) {
             return;
         }
-        this._debouncedUpdateDecorations(this._activeEditor, tree, changedRange, visibleRanges);
-    }
-
-    private onDidChangeActiveTextEditor(editor: vscode.TextEditor | undefined): void {
-        this.setActiveEditor(editor);
+        this._debouncedUpdateDecorations(activeEditor, tree, changedRange, visibleRanges);
     }
 
     private onDidChangeTextEditorVisibleRanges(event: vscode.TextEditorVisibleRangesChangeEvent): void {
-        if (this._activeEditor && event.textEditor === this._activeEditor) {
-            const documentModel = this._extensionState.getDocumentModel(this._activeEditor.document.uri.toString());
+        const activeEditor = this._extensionState.activeEditor;
+        if (activeEditor && event.textEditor === activeEditor) {
+            const documentModel = this._extensionState.getDocumentModel(activeEditor.document.uri.toString());
             if (documentModel) {
                 // Trigger an update, passing the new visible ranges
-                this.updateDecorations(documentModel.documentTree, new vscode.Range(0, 0, this._activeEditor.document.lineCount, 0), event.visibleRanges);
+                this.updateDecorations(documentModel.documentTree, new vscode.Range(0, 0, activeEditor.document.lineCount, 0), event.visibleRanges);
             }
         }
     }
@@ -112,7 +90,8 @@ export class DecorationManager {
     // and the debounced nature of applyDecorationsInternal.
 
     private onDidChangeTextEditorSelection(event: vscode.TextEditorSelectionChangeEvent): void {
-        if (this._activeEditor && event.textEditor === this._activeEditor) {
+        const activeEditor = this._extensionState.activeEditor;
+        if (activeEditor && event.textEditor === activeEditor) {
             // Handle cursor positioning to prevent typing before bullet points
             const editor = event.textEditor;
             const document = editor.document;
