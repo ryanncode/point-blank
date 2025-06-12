@@ -56,6 +56,24 @@ export class DocumentTree {
     }
 
     /**
+     * Returns all BlockNodes within a specified line number range, ordered by line number.
+     * This is useful for operations that need to process only a visible portion of the document.
+     * @param startLine The starting line number (inclusive).
+     * @param endLine The ending line number (inclusive).
+     * @returns An array of BlockNodes within the specified range.
+     */
+    public getNodesInLineRange(startLine: number, endLine: number): BlockNode[] {
+        const nodesInRange: BlockNode[] = [];
+        for (let i = startLine; i <= endLine; i++) {
+            const node = this._nodesByLine.get(i);
+            if (node) {
+                nodesInRange.push(node);
+            }
+        }
+        return nodesInRange;
+    }
+
+    /**
      * Creates a new DocumentTree instance with updated root nodes.
      * This is used by the incremental parser to return a new immutable tree.
      */
