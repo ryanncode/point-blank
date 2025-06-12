@@ -44,6 +44,14 @@ export class Configuration {
     }
 
     /**
+     * Retrieves the configured viewport buffer size.
+     * @returns The number of extra lines to render above and below the visible viewport.
+     */
+    public getViewportBuffer(): number {
+        return this.getConfiguration().get<number>('viewportBuffer') || 20;
+    }
+
+    /**
      * Initializes or re-initializes all VS Code decoration types based on the current
      * extension configuration. Existing decoration types are disposed to prevent memory leaks.
      * This method should be called on extension activation and whenever configuration changes.

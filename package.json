@@ -95,13 +95,18 @@
         },
         "pointblank.debounceDelay": {
           "type": "number",
-          "default": 150,
+          "default": 50,
           "description": "The debounce delay in milliseconds for document and visible range changes. Increase for better performance on large files, decrease for more responsiveness."
         },
         "pointblank.newFileDirectory": {
           "type": "string",
           "default": ".",
           "description": "The default directory for new files created via Quick Open. Relative to the workspace root."
+        },
+        "pointblank.viewportBuffer": {
+          "type": "number",
+          "default": 20,
+          "description": "The number of extra lines to render above and below the visible viewport for decorations. Increase for smoother scrolling effects."
         }
       }
     }
