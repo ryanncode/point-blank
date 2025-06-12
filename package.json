@@ -95,7 +95,7 @@
         },
         "pointblank.debounceDelay": {
           "type": "number",
-          "default": 50,
+          "default": 15,
           "description": "The debounce delay in milliseconds for document and visible range changes. Increase for better performance on large files, decrease for more responsiveness."
         },
         "pointblank.newFileDirectory": {

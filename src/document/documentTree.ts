@@ -64,11 +64,17 @@ export class DocumentTree {
      */
     public getNodesInLineRange(startLine: number, endLine: number): BlockNode[] {
         const nodesInRange: BlockNode[] = [];
-        for (let i = startLine; i <= endLine; i++) {
-            const node = this._nodesByLine.get(i);
-            if (node) {
+        let collecting = false;
+
+        for (const node of this._nodesByLine.values()) {
+            if (node.lineNumber >= startLine && node.lineNumber <= endLine) {
                 nodesInRange.push(node);
+                collecting = true;
+            } else if (collecting) {
+                // If we were collecting and now the line number is outside the range, we can stop
+                break;
             }
+            // If not yet collecting and node.lineNumber < startLine, continue iterating
         }
         return nodesInRange;
     }

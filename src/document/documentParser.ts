@@ -35,7 +35,8 @@ export class DocumentParser {
             flatNodes.push(newNode);
         }
 
-        return DocumentTree.create(document, flatNodes);
+        const tree = DocumentTree.create(document, flatNodes);
+        return tree;
     }
 
     /**
@@ -47,6 +48,7 @@ export class DocumentParser {
      */
     public parse(previousTree: DocumentTree, changes: readonly vscode.TextDocumentContentChangeEvent[]): DocumentTree {
         if (changes.length === 0) {
+            console.timeEnd('DocumentParser.parse');
             return previousTree;
         }
 
@@ -69,7 +71,8 @@ export class DocumentParser {
         // 3. Rebuild the entire tree hierarchy from the new flat list
         const rootNodes = this.buildTreeFromFlatList(newNodes);
 
-        return DocumentTree.create(document, rootNodes);
+        const tree = DocumentTree.create(document, rootNodes);
+        return tree;
     }
 
     /**

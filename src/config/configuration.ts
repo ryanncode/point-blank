@@ -40,7 +40,7 @@ export class Configuration {
      * @returns The debounce delay in milliseconds.
      */
     public getDebounceDelay(): number {
-        return this.getConfiguration().get<number>('debounceDelay') || 150;
+        return this.getConfiguration().get<number>('debounceDelay') || 15;
     }
 
     /**
