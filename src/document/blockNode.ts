@@ -81,12 +81,14 @@ export class BlockNode {
         }
 
         // Check for Key:: Value pattern
-        const keyValueMatch = lineTextFromNonWhitespace.match(/^(\S+::)\s*(.*)/);
+        const keyValueMatch = lineTextFromNonWhitespace.match(/^(-\s*)?(\S+::)\s*(.*)/);
         if (keyValueMatch) {
             isKeyValue = true;
-            const keyPart = keyValueMatch[1];
-            const valuePart = keyValueMatch[2];
-            const keyRange = new vscode.Range(this.lineNumber, this.indent, this.lineNumber, this.indent + keyPart.length);
+            const leadingDash = keyValueMatch[1] || ''; // Capture group 1: optional "- "
+            const keyPart = keyValueMatch[2]; // Capture group 2: "Key::"
+            const valuePart = keyValueMatch[3]; // Capture group 3: "Value"
+            const keyStartCharacter = this.indent + leadingDash.length;
+            const keyRange = new vscode.Range(this.lineNumber, keyStartCharacter, this.lineNumber, keyStartCharacter + keyPart.length);
             const fullRange = new vscode.Range(this.lineNumber, 0, this.lineNumber, this.text.length);
             keyValue = {
                 key: keyPart.slice(0, -2), // Remove "::"
