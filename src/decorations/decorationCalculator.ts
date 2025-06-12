@@ -13,16 +13,10 @@ export class DecorationCalculator {
      * @param decorationsMap The map to populate with calculated decorations.
      * @param totalLineCount The total number of lines in the document.
      */
-    public static calculateDecorations(nodes: BlockNode[], decorationsMap: Map<string, vscode.DecorationOptions[]>, totalLineCount: number): void {
+    public static calculateDecorations(nodes: BlockNode[], decorationsMap: Map<string, vscode.DecorationOptions[]>): void {
         for (const node of nodes) {
             // General skip for code blocks, excluded lines, and any line VS Code considers empty/whitespace
             if (node.isCodeBlockDelimiter || node.isExcluded || node.line.isEmptyOrWhitespace) {
-                continue;
-            }
-
-            // Explicitly skip decoration for the very last line if it's empty or only whitespace
-            const isLastLine = node.lineNumber === (totalLineCount - 1);
-            if (isLastLine && node.text.trim().length === 0) {
                 continue;
             }
 

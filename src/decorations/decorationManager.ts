@@ -13,11 +13,8 @@ export class DecorationManager {
     private _extensionState: ExtensionState;
     private _decorationTypes: Map<string, vscode.TextEditorDecorationType> = new Map();
     private _disposables: vscode.Disposable[] = [];
-    // Stores the currently applied decorations, categorized by type
-    private _currentDecorations: Map<string, vscode.DecorationOptions[]> = new Map();
-
     // Debounced function for general decoration updates, now including visible ranges
-    private _debouncedUpdateDecorations: (editor: vscode.TextEditor, tree: DocumentTree, changedRange: vscode.Range, visibleRanges?: readonly vscode.Range[]) => void;
+    private _debouncedUpdateDecorations: (editor: vscode.TextEditor, tree: DocumentTree, visibleRanges?: readonly vscode.Range[]) => void;
 
     constructor() {
         this._extensionState = ExtensionState.getInstance();
@@ -53,8 +50,6 @@ export class DecorationManager {
             const decorationType = this._extensionState.getDecorationType(typeName);
             if (decorationType) {
                 this._decorationTypes.set(typeName, decorationType);
-                // Initialize _currentDecorations map with empty arrays for each type
-                this._currentDecorations.set(typeName, []);
             }
         }
     }
@@ -64,15 +59,14 @@ export class DecorationManager {
      * by DocumentModel whenever the document tree changes.
      * It uses a debounced mechanism to prevent excessive updates.
      * @param tree The current `DocumentTree`.
-     * @param changedRange The range of lines that have changed in the document.
      * @param visibleRanges Optional: The currently visible ranges in the editor. If not provided, current editor's visible ranges will be used.
      */
-    public updateDecorations(tree: DocumentTree, changedRange: vscode.Range, visibleRanges?: readonly vscode.Range[]): void {
+    public updateDecorations(tree: DocumentTree, visibleRanges?: readonly vscode.Range[]): void {
         const activeEditor = this._extensionState.activeEditor;
         if (!activeEditor || activeEditor.document.uri.toString() !== tree.document.uri.toString()) {
             return;
         }
-        this._debouncedUpdateDecorations(activeEditor, tree, changedRange, visibleRanges);
+        this._debouncedUpdateDecorations(activeEditor, tree, visibleRanges);
     }
 
     private onDidChangeTextEditorVisibleRanges(event: vscode.TextEditorVisibleRangesChangeEvent): void {
@@ -81,7 +75,7 @@ export class DecorationManager {
             const documentModel = this._extensionState.getDocumentModel(activeEditor.document.uri.toString());
             if (documentModel) {
                 // Trigger an update, passing the new visible ranges
-                this.updateDecorations(documentModel.documentTree, new vscode.Range(0, 0, activeEditor.document.lineCount, 0), event.visibleRanges);
+                this.updateDecorations(documentModel.documentTree, event.visibleRanges);
             }
         }
     }
@@ -121,64 +115,28 @@ export class DecorationManager {
      * logic that gets debounced.
      * @param editor The active text editor.
      * @param tree The current `DocumentTree`.
-     * @param changedRange The range of lines that have changed.
      * @param visibleRanges The currently visible ranges in the editor.
      */
-    private applyDecorationsInternal(editor: vscode.TextEditor, tree: DocumentTree, _changedRange: vscode.Range, visibleRanges?: readonly vscode.Range[]): void {
+    private applyDecorationsInternal(editor: vscode.TextEditor, tree: DocumentTree, visibleRanges?: readonly vscode.Range[]): void {
         if (!editor) {
             return;
         }
 
-        const bufferLines = 5; // Number of lines to extend above and below the visible range
-
-        // 1. Determine the actual range of lines that need to be re-evaluated for decorations.
-        // This is the union of the visible ranges and the changed range, expanded by a buffer.
-        let effectiveStartLine = editor.document.lineCount;
-        let effectiveEndLine = 0;
-
-        // Include visible ranges
-        const currentVisibleRanges = visibleRanges && visibleRanges.length > 0 ? visibleRanges : [new vscode.Range(0, 0, editor.document.lineCount, 0)];
-        for (const range of currentVisibleRanges) {
-            effectiveStartLine = Math.min(effectiveStartLine, range.start.line);
-            effectiveEndLine = Math.max(effectiveEndLine, range.end.line);
-        }
-
-        // Include changed range
-        effectiveStartLine = Math.min(effectiveStartLine, _changedRange.start.line);
-        effectiveEndLine = Math.max(effectiveEndLine, _changedRange.end.line);
-
-        // Apply buffer
-        effectiveStartLine = Math.max(0, effectiveStartLine - bufferLines);
-        effectiveEndLine = Math.min(editor.document.lineCount - 1, effectiveEndLine + bufferLines);
-
-        const effectiveRange = new vscode.Range(effectiveStartLine, 0, effectiveEndLine, editor.document.lineAt(effectiveEndLine).text.length);
-
-        // 2. Get nodes within this effective range
-        const nodesToRecalculate = tree.getNodesInLineRange(effectiveRange.start.line, effectiveRange.end.line);
-
-        // 3. Calculate new decorations for this effective range
-        const recalculatedDecorationsForEffectiveRange = new Map<string, vscode.DecorationOptions[]>();
+        const decorationsToApply = new Map<string, vscode.DecorationOptions[]>();
         for (const key of this._decorationTypes.keys()) {
-            recalculatedDecorationsForEffectiveRange.set(key, []);
-        }
-        DecorationCalculator.calculateDecorations(nodesToRecalculate, recalculatedDecorationsForEffectiveRange, editor.document.lineCount);
-
-        // 4. Update _currentDecorations:
-        //    a. Remove all old decorations that intersect with the effectiveRange.
-        //    b. Add the newly calculated decorations for the effectiveRange.
-        for (const [typeName, currentOptions] of this._currentDecorations.entries()) {
-            // Filter out old decorations that are within the effective range
-            const filteredOptions = currentOptions.filter(option => !effectiveRange.intersection(option.range));
-            this._currentDecorations.set(typeName, filteredOptions);
-
-            // Add the newly calculated decorations for this type within the effective range
-            const newOptionsForType = recalculatedDecorationsForEffectiveRange.get(typeName) || [];
-            this._currentDecorations.set(typeName, [...(this._currentDecorations.get(typeName) || []), ...newOptionsForType]);
+            decorationsToApply.set(key, []);
         }
 
-        // 5. Apply the *entire* _currentDecorations to the editor
+        const currentVisibleRanges = visibleRanges && visibleRanges.length > 0 ? visibleRanges : [new vscode.Range(0, 0, editor.document.lineCount, 0)];
+
+        for (const range of currentVisibleRanges) {
+            const nodesInVisibleRange = tree.getNodesInLineRange(range.start.line, range.end.line);
+            DecorationCalculator.calculateDecorations(nodesInVisibleRange, decorationsToApply);
+        }
+
+        // Apply the newly calculated decorations to the editor
         for (const [typeName, decorationType] of this._decorationTypes.entries()) {
-            const optionsToApply = this._currentDecorations.get(typeName) || [];
+            const optionsToApply = decorationsToApply.get(typeName) || [];
             editor.setDecorations(decorationType, optionsToApply);
         }
     }
@@ -189,7 +147,6 @@ export class DecorationManager {
     public dispose(): void {
         this._disposables.forEach(d => d.dispose());
         this._disposables = [];
-        this._currentDecorations.clear();
         // Dispose of decoration types to prevent memory leaks
         this._decorationTypes.forEach(type => type.dispose());
         this._decorationTypes.clear();

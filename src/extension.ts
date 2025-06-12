@@ -76,7 +76,7 @@ export function activate(context: vscode.ExtensionContext): void {
             if (vscode.window.activeTextEditor) {
                 const documentModel = extensionState.getDocumentModel(vscode.window.activeTextEditor.document.uri.toString());
                 if (documentModel) {
-                    decorationManager.updateDecorations(documentModel.documentTree, new vscode.Range(0, 0, vscode.window.activeTextEditor.document.lineCount, 0));
+                    decorationManager.updateDecorations(documentModel.documentTree, [new vscode.Range(0, 0, vscode.window.activeTextEditor.document.lineCount, 0)]);
                 }
             }
         }
