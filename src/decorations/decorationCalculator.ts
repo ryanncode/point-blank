@@ -11,11 +11,19 @@ export class DecorationCalculator {
      * with decoration options categorized by type.
      * @param nodes The document nodes to process.
      * @param decorationsMap The map to populate with calculated decorations.
+     * @param totalLineCount The total number of lines in the document.
      */
-    public static calculateDecorations(nodes: BlockNode[], decorationsMap: Map<string, vscode.DecorationOptions[]>): void {
+    public static calculateDecorations(nodes: BlockNode[], decorationsMap: Map<string, vscode.DecorationOptions[]>, totalLineCount: number): void {
         for (const node of nodes) {
+            // General skip for code blocks, excluded lines, and any line VS Code considers empty/whitespace
             if (node.isCodeBlockDelimiter || node.isExcluded || node.line.isEmptyOrWhitespace) {
                 continue;
+            }
+
+            // Specific check for the very last line if it's visually empty
+            const isLastLine = node.lineNumber === (totalLineCount - 1);
+            if (isLastLine && node.text.trim().length === 0) {
+                continue; // Explicitly skip decoration for an empty last line
             }
 
             if (node.isTypedNode && node.typedNodeRange) {

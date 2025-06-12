@@ -161,7 +161,7 @@ export class DecorationManager {
         for (const key of this._decorationTypes.keys()) {
             recalculatedDecorationsForEffectiveRange.set(key, []);
         }
-        DecorationCalculator.calculateDecorations(nodesToRecalculate, recalculatedDecorationsForEffectiveRange);
+        DecorationCalculator.calculateDecorations(nodesToRecalculate, recalculatedDecorationsForEffectiveRange, editor.document.lineCount);
 
         // 4. Update _currentDecorations:
         //    a. Remove all old decorations that intersect with the effectiveRange.
