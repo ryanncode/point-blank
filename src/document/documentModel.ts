@@ -42,6 +42,16 @@ export class DocumentModel {
     }
 
     /**
+     * Triggers a full decoration update for the document managed by this model.
+     * This is useful when the document becomes active or is opened.
+     */
+    public triggerUpdateDecorations(): void {
+        if (this._decorationManager) {
+            this._decorationManager.updateDecorations(this._documentTree);
+        }
+    }
+
+    /**
      * Returns all parsed BlockNodes for the current document in a flat array.
      */
     public get nodes(): BlockNode[] {

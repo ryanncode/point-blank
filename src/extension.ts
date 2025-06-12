@@ -99,6 +99,12 @@ export function activate(context: vscode.ExtensionContext): void {
     // The DecorationManager handles setting its active editor internally.
     vscode.window.onDidChangeActiveTextEditor(editor => {
         extensionState.setActiveEditor(editor);
+        if (editor) {
+            const documentModel = extensionState.getDocumentModel(editor.document.uri.toString());
+            if (documentModel) {
+                documentModel.triggerUpdateDecorations();
+            }
+        }
     }, null, context.subscriptions);
 
     // Listen for document close events to dispose of DocumentModel instances
