@@ -20,10 +20,10 @@ export class DecorationCalculator {
                 continue;
             }
 
-            // Specific check for the very last line if it's visually empty
+            // Explicitly skip decoration for the very last line if it's empty or only whitespace
             const isLastLine = node.lineNumber === (totalLineCount - 1);
             if (isLastLine && node.text.trim().length === 0) {
-                continue; // Explicitly skip decoration for an empty last line
+                continue;
             }
 
             if (node.isTypedNode && node.typedNodeRange) {
@@ -68,9 +68,12 @@ export class DecorationCalculator {
                 continue;
             }
 
-            // Default bullet point for any line that is not otherwise decorated
-            const range = new vscode.Range(node.lineNumber, firstCharIndex, node.lineNumber, firstCharIndex + 1);
-            decorationsMap.get('bulletDecorationType')!.push({ range });
+            // Default bullet point for any line that is not otherwise decorated, but only if it has content
+            if (node.trimmedText.length > 0) {
+                // Set range to zero-width at the start of the line's content
+                const range = new vscode.Range(node.lineNumber, firstCharIndex, node.lineNumber, firstCharIndex);
+                decorationsMap.get('bulletDecorationType')!.push({ range });
+            }
         }
     }
 }
