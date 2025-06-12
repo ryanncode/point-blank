@@ -86,13 +86,29 @@ export class DocumentModel {
             }
         }
 
+        // Calculate the dirty range based on content changes
+        let dirtyStartLine = this._document.lineCount;
+        let dirtyEndLine = 0;
+
+        for (const change of event.contentChanges) {
+            dirtyStartLine = Math.min(dirtyStartLine, change.range.start.line);
+            dirtyEndLine = Math.max(dirtyEndLine, change.range.end.line + change.text.split('\n').length - 1);
+        }
+
+        // Expand the dirty range slightly to account for potential ripple effects (e.g., indentation changes)
+        const bufferLines = 2; // Small buffer for safety
+        dirtyStartLine = Math.max(0, dirtyStartLine - bufferLines);
+        dirtyEndLine = Math.min(this._document.lineCount - 1, dirtyEndLine + bufferLines);
+
+        const dirtyRange = new vscode.Range(dirtyStartLine, 0, dirtyEndLine, this._document.lineAt(dirtyEndLine).text.length);
+
         // Parse the document incrementally (or full parse for now)
         const newDocumentTree = this._parser.parse(this._documentTree, event.contentChanges);
         this._documentTree = newDocumentTree;
 
-        // Notify DecorationManager with the new tree. The DecorationManager will now
-        // always perform a full re-render, so a specific changedRange is not needed here.
-        this._decorationManager.updateDecorations(this._documentTree, new vscode.Range(0, 0, this._document.lineCount, 0));
+        // Notify DecorationManager with the new tree and the calculated dirty range.
+        // The DecorationManager will use this range to clear old decorations.
+        this._decorationManager.updateDecorations(this._documentTree, dirtyRange);
     }
 
     /**

@@ -150,32 +150,57 @@ export class DecorationManager {
             return;
         }
 
-        // Determine the ranges to consider for decoration calculation.
-        // If visibleRanges are provided, use them; otherwise, default to the entire document.
-        const rangesToDecorate = visibleRanges && visibleRanges.length > 0 ? visibleRanges : [new vscode.Range(0, 0, editor.document.lineCount, 0)];
-
         const bufferLines = 5; // Number of lines to extend above and below the visible range
 
-        const nodesToDecorate: BlockNode[] = [];
-        for (const range of rangesToDecorate) {
-            const startLine = Math.max(0, range.start.line - bufferLines);
-            const endLine = Math.min(editor.document.lineCount - 1, range.end.line + bufferLines);
-            nodesToDecorate.push(...tree.getNodesInLineRange(startLine, endLine));
+        // 1. Determine the actual range of lines that need to be re-evaluated for decorations.
+        // This is the union of the visible ranges and the changed range, expanded by a buffer.
+        let effectiveStartLine = editor.document.lineCount;
+        let effectiveEndLine = 0;
+
+        // Include visible ranges
+        const currentVisibleRanges = visibleRanges && visibleRanges.length > 0 ? visibleRanges : [new vscode.Range(0, 0, editor.document.lineCount, 0)];
+        for (const range of currentVisibleRanges) {
+            effectiveStartLine = Math.min(effectiveStartLine, range.start.line);
+            effectiveEndLine = Math.max(effectiveEndLine, range.end.line);
         }
 
-        const newCalculatedDecorations = new Map<string, vscode.DecorationOptions[]>();
+        // Include changed range
+        effectiveStartLine = Math.min(effectiveStartLine, _changedRange.start.line);
+        effectiveEndLine = Math.max(effectiveEndLine, _changedRange.end.line);
 
+        // Apply buffer
+        effectiveStartLine = Math.max(0, effectiveStartLine - bufferLines);
+        effectiveEndLine = Math.min(editor.document.lineCount - 1, effectiveEndLine + bufferLines);
+
+        const effectiveRange = new vscode.Range(effectiveStartLine, 0, effectiveEndLine, editor.document.lineAt(effectiveEndLine).text.length);
+
+        // 2. Get nodes within this effective range
+        const nodesToRecalculate = tree.getNodesInLineRange(effectiveRange.start.line, effectiveRange.end.line);
+
+        // 3. Calculate new decorations for this effective range
+        const recalculatedDecorationsForEffectiveRange = new Map<string, vscode.DecorationOptions[]>();
         for (const key of this._decorationTypes.keys()) {
-            newCalculatedDecorations.set(key, []);
+            recalculatedDecorationsForEffectiveRange.set(key, []);
+        }
+        DecorationCalculator.calculateDecorations(nodesToRecalculate, recalculatedDecorationsForEffectiveRange);
+
+        // 4. Update _currentDecorations:
+        //    a. Remove all old decorations that intersect with the effectiveRange.
+        //    b. Add the newly calculated decorations for the effectiveRange.
+        for (const [typeName, currentOptions] of this._currentDecorations.entries()) {
+            // Filter out old decorations that are within the effective range
+            const filteredOptions = currentOptions.filter(option => !effectiveRange.intersection(option.range));
+            this._currentDecorations.set(typeName, filteredOptions);
+
+            // Add the newly calculated decorations for this type within the effective range
+            const newOptionsForType = recalculatedDecorationsForEffectiveRange.get(typeName) || [];
+            this._currentDecorations.set(typeName, [...(this._currentDecorations.get(typeName) || []), ...newOptionsForType]);
         }
 
-        DecorationCalculator.calculateDecorations(nodesToDecorate, newCalculatedDecorations);
-
-        // Apply all decorations for each type. This replaces any previously set decorations.
+        // 5. Apply the *entire* _currentDecorations to the editor
         for (const [typeName, decorationType] of this._decorationTypes.entries()) {
-            const options = newCalculatedDecorations.get(typeName) || [];
-            editor.setDecorations(decorationType, options);
-            this._currentDecorations.set(typeName, options); // Update internal state to reflect what's applied
+            const optionsToApply = this._currentDecorations.get(typeName) || [];
+            editor.setDecorations(decorationType, optionsToApply);
         }
     }
 
