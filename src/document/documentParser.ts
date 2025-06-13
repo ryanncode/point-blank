@@ -49,7 +49,6 @@ export class DocumentParser {
      */
     public parse(previousTree: DocumentTree, changes: readonly vscode.TextDocumentContentChangeEvent[]): DocumentTree {
         if (changes.length === 0) {
-            console.timeEnd('DocumentParser.parse');
             return previousTree;
         }
 
@@ -117,22 +116,22 @@ export class DocumentParser {
             headerLevel: number;
         }
 
-        const mutableNodes: TempMutableNode[] = nodes.map(node => ({
-            original: node,
-            children: [],
-            lineNumber: node.lineNumber,
-            indent: node.indent,
-            trimmedText: node.trimmedText,
-            isExcluded: node.isExcluded,
-            isCodeBlockDelimiter: node.isCodeBlockDelimiter,
-            headerLevel: DocumentParser.getHeaderLevel(node.text) // Use node.text (untrimmed)
-        }));
-
         const mutableRootNodes: TempMutableNode[] = [];
         const parentStack: TempMutableNode[] = []; // Stores potential parent mutable nodes
 
-        // Pass 1: Build a Mutable Tree based on indentation only
-        for (const mutableNode of mutableNodes) {
+        // Single Pass: Build a Mutable Tree based on indentation and header levels
+        for (const node of nodes) {
+            const mutableNode: TempMutableNode = {
+                original: node,
+                children: [],
+                lineNumber: node.lineNumber,
+                indent: node.indent,
+                trimmedText: node.trimmedText,
+                isExcluded: node.isExcluded,
+                isCodeBlockDelimiter: node.trimmedText.startsWith('```'),
+                headerLevel: DocumentParser.getHeaderLevel(node.text) // Use node.text (untrimmed)
+            };
+
             // Pop parents from stack if current node is less indented or same indentation
             while (parentStack.length > 0 && mutableNode.indent <= parentStack[parentStack.length - 1].indent) {
                 parentStack.pop();
@@ -154,7 +153,7 @@ export class DocumentParser {
             }
         }
 
-        // Pass 2: Convert to an Immutable Tree (bottom-up)
+        // Convert to an Immutable Tree (bottom-up)
         const immutableNodeMap = new Map<TempMutableNode, BlockNode>();
 
         const convertToImmutable = (mutableNode: TempMutableNode): BlockNode => {

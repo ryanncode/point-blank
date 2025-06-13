@@ -3,6 +3,7 @@ import { DocumentParser } from './documentParser';
 import { DecorationManager } from '../decorations/decorationManager';
 import { DocumentTree } from './documentTree';
 import { BlockNode } from './blockNode'; // Import BlockNode
+import { Timer } from '../utils/timer'; // Import Timer utility
 
 /**
  * Manages the document's parsed structure (DocumentTree of BlockNodes).
@@ -15,6 +16,7 @@ export class DocumentModel {
     private _parser: DocumentParser;
     private _decorationManager: DecorationManager | undefined;
     private _disposables: vscode.Disposable[] = [];
+    private _parseTimer: Timer; // Timer for document parsing
 
     constructor(document: vscode.TextDocument) {
         this._document = document;
@@ -22,6 +24,7 @@ export class DocumentModel {
 
         // Initial parse
         this._documentTree = this._parser.fullParse(this._document);
+        this._parseTimer = new Timer('Document Parsing');
 
         // Listen for document changes
         vscode.workspace.onDidChangeTextDocument(this.onDidChangeTextDocument, this, this._disposables);
@@ -81,7 +84,9 @@ export class DocumentModel {
 
 
         // Parse the document incrementally (or full parse for now)
+        this._parseTimer.start();
         const newDocumentTree = this._parser.parse(this._documentTree, event.contentChanges);
+        this._parseTimer.stop();
         this._documentTree = newDocumentTree;
 
         // Notify DecorationManager with the new tree.

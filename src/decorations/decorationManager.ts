@@ -5,6 +5,7 @@ import { DecorationCalculator } from './decorationCalculator';
 import { ExtensionState } from '../state/extensionState';
 import { debounce } from '../utils/debounce';
 import { Configuration } from '../config/configuration';
+import { Timer } from '../utils/timer'; // Import Timer utility
 
 /**
  * Manages and applies text editor decorations based on document changes.
@@ -16,9 +17,11 @@ export class DecorationManager implements vscode.Disposable {
     private _disposables: vscode.Disposable[] = [];
     // Debounced function for general decoration updates, now including visible ranges
     private _debouncedUpdateDecorations?: (editor: vscode.TextEditor, tree: DocumentTree) => void;
+    private _screenUpdateTimer: Timer; // Timer for screen updates
 
     constructor() {
         this._extensionState = ExtensionState.getInstance();
+        this._screenUpdateTimer = new Timer('Screen Update');
     }
 
     /**
@@ -94,6 +97,8 @@ export class DecorationManager implements vscode.Disposable {
             return;
         }
 
+        this._screenUpdateTimer.start();
+
         const decorationsToApply = new Map<string, vscode.DecorationOptions[]>();
         for (const key of this._decorationTypes.keys()) {
             decorationsToApply.set(key, []);
@@ -141,6 +146,7 @@ export class DecorationManager implements vscode.Disposable {
             const optionsToApply = decorationsToApply.get(typeName) || [];
             editor.setDecorations(decorationType, optionsToApply);
         }
+        this._screenUpdateTimer.stop();
     }
 
     /**
