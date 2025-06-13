@@ -1,12 +1,11 @@
 import * as vscode from 'vscode';
-import { IndentFoldingRangeProvider } from '../providers/indentFoldingProvider';
 
 /**
  * Provides utility functions related to folding ranges.
  */
 export class FoldingUtils {
     /**
-     * Retrieves all folding ranges for a given text document using the IndentFoldingRangeProvider.
+     * Retrieves all folding ranges for a given text document using VS Code's native folding provider.
      * @param document The text document.
      * @returns A promise that resolves to an array of FoldingRange objects.
      */
