@@ -58,7 +58,7 @@ export class CommandManager {
                     // Check if the line is currently empty or only contains whitespace
                     // AND the cursor is at the beginning of the line's content (after any indentation)
                     if (line.text.trim().length === 0 && position.character === line.firstNonWhitespaceCharacterIndex) {
-                        const markdownPrefixRegex = /^\s*([\*\+\-]|>|#{1,6}|\d+[\.\)])/;
+                        const markdownPrefixRegex = /^\s*([\*\+\-@]|>|#{1,6}|\d+[\.\)])/;
                         // Prevent insertion if the typed character is a markdown prefix
                         if (!markdownPrefixRegex.test(typedCharacter)) {
                             // Use insertSnippet to atomically insert the bullet and the typed character

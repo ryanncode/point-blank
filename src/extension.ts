@@ -41,7 +41,6 @@ export function activate(context: vscode.ExtensionContext): void {
     // Register CommandManager listeners and overrides
     commandManager.register(context);
 
-
     // Initialize InlineCompletionProvider
     context.subscriptions.push(new InlineCompletionProvider(context));
 
