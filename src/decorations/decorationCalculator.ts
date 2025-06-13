@@ -63,11 +63,11 @@ export class DecorationCalculator {
                     }
                     break;
                 }
-                default: {
+                case 'implicit': {
                     // Default bullet point for any line that is not otherwise decorated, but only if it has content
                     if (node.trimmedText.length > 0) {
                         // Set range to zero-width at the start of the line's content
-                        const range = new vscode.Range(node.lineNumber, firstCharIndex, node.lineNumber, firstCharIndex);
+                        const range = new vscode.Range(node.lineNumber, firstCharIndex, node.lineNumber, firstCharIndex + 1);
                         decorationsMap.get('bulletDecorationType')!.push({ range });
                     }
                     break;

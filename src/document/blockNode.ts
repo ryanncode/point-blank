@@ -24,7 +24,7 @@ export class BlockNode {
     public readonly typedNodeRange?: vscode.Range; // Range of the typed node (e.g., "(Book)")
     public readonly isCodeBlockDelimiter: boolean; // To handle code blocks
     public readonly isExcluded: boolean; // To handle excluded lines (e.g., Markdown headers)
-    public readonly bulletType: 'default' | 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'none';
+    public readonly bulletType: 'implicit' | 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'none';
 
     // Hierarchical properties
     public readonly parent?: BlockNode;
@@ -36,7 +36,7 @@ export class BlockNode {
         isExcluded: boolean, // Determined by parser based on code blocks, etc.
         parent?: BlockNode,
         children: BlockNode[] = [],
-        bulletType: 'default' | 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'none' = 'none'
+        bulletType: 'implicit' | 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'none' = 'none'
     ) {
         this.line = line;
         this.lineNumber = lineNumber;
@@ -127,7 +127,7 @@ export class BlockNode {
     /**
      * Determines the bullet type based on the trimmed line content.
      */
-    private determineBulletType(trimmedText: string, isCodeBlockDelimiter: boolean, isExcluded: boolean): 'default' | 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'none' {
+    private determineBulletType(trimmedText: string, isCodeBlockDelimiter: boolean, isExcluded: boolean): 'implicit' | 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'none' {
         if (trimmedText.startsWith('* ')) {
             return 'star';
         } else if (trimmedText.startsWith('+ ')) {
@@ -139,7 +139,7 @@ export class BlockNode {
         } else if (trimmedText.startsWith('> ')) {
             return 'blockquote';
         } else if (trimmedText.length > 0 && !isCodeBlockDelimiter && !isExcluded) {
-            return 'default';
+            return 'implicit';
         }
         return 'none';
     }

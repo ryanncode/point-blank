@@ -95,16 +95,32 @@ export class DecorationManager implements vscode.Disposable {
             if (selection.isEmpty) { // Only act if there's a single cursor
                 const currentLine = document.lineAt(selection.active.line);
                 const firstCharIndex = currentLine.firstNonWhitespaceCharacterIndex;
+                const documentModel = this._extensionState.getDocumentModel(document.uri.toString());
+                const node = documentModel?.documentTree.getNodeAtLine(selection.active.line); // Fixed: getNodeByLineNumber to getNodeAtLine
 
-                // Check if the current line has a bullet point (simple check for common bullet types)
-                const hasBullet = currentLine.text.substring(firstCharIndex, firstCharIndex + 2).match(/^(\*|\-|\+|\d+\.|\d+\))\s/);
+                if (node) {
+                    let bulletEndPosition = -1;
+                    switch (node.bulletType) {
+                        case 'star':
+                        case 'plus':
+                        case 'minus':
+                        case 'blockquote':
+                            bulletEndPosition = firstCharIndex + 1; // For single character bullets
+                            break;
+                        case 'numbered':
+                            const numberedMatch = node.trimmedText.match(/^(\d+[\.\)])\s*/);
+                            if (numberedMatch) {
+                                bulletEndPosition = firstCharIndex + numberedMatch[1].length;
+                            }
+                            break;
+                        case 'implicit':
+                            bulletEndPosition = firstCharIndex; // For default, cursor should be at the start of content
+                            break;
+                    }
 
-                if (hasBullet) {
-                    const bulletEndPosition = firstCharIndex + hasBullet[0].length;
-                    // If cursor is before the end of the bullet point, move it after
-                    if (selection.active.character < bulletEndPosition) {
+                    if (bulletEndPosition !== -1 && selection.active.character < bulletEndPosition) {
                         const newPosition = new vscode.Position(selection.active.line, bulletEndPosition);
-                        editor.selection = new vscode.Selection(newPosition, newPosition);
+                        editor.selection = new vscode.Selection(newPosition, newPosition); // Fixed: selection.active.line, bulletEndPosition to newPosition, newPosition
                     }
                 }
             }
