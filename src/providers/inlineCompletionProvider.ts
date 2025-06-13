@@ -25,24 +25,22 @@ export class InlineCompletionProvider implements vscode.Disposable {
             return;
         }
 
-        // Only process single character changes, specifically a space
         const line = activeEditor.document.lineAt(activeEditor.selection.active.line);
         const lineText = line.text;
-        const trimmedLineText = lineText.trim();
 
         // Set context for 'pointblank.isAtSignLine'
-        const isAtSignLine = trimmedLineText.startsWith('@');
+        const isAtSignLine = lineText.trim().startsWith('@');
         vscode.commands.executeCommand('setContext', 'pointblank.isAtSignLine', isAtSignLine);
 
         // Only process single character changes, specifically a space
         if (event.contentChanges.length === 1) {
             const change = event.contentChanges[0];
 
-            // Check for the pattern "@TypeName " followed by a space
-            const typedNodeTriggerMatch = trimmedLineText.match(/^@([a-zA-Z0-9_]+)\s$/);
+            // Check for the pattern "@TypeName " followed by a space, allowing for leading indentation
+            const typedNodeTriggerMatch = lineText.match(/^(\s*)@([a-zA-Z0-9_]+)\s$/);
 
             if (typedNodeTriggerMatch && change.text === ' ') {
-                const typeName = typedNodeTriggerMatch[1];
+                const typeName = typedNodeTriggerMatch[2];
                 // Execute the expandTemplate command
                 vscode.commands.executeCommand('pointblank.expandTemplate', typeName, this._extensionState.getDocumentModel(event.document.uri.toString()));
                 // Return early as the command will trigger another document change event
