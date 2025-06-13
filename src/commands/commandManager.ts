@@ -119,11 +119,34 @@ export class CommandManager {
             vscode.commands.registerTextEditorCommand('pointblank.tab', async (editor) => {
                 const position = editor.selection.active;
                 const line = editor.document.lineAt(position.line);
-                const indentSpaces = '    '; // Assuming 4 spaces for indentation
+                const documentModel = this.extensionState.getDocumentModel(editor.document.uri.toString());
 
-                await editor.edit(editBuilder => {
-                    editBuilder.insert(new vscode.Position(line.lineNumber, 0), indentSpaces);
-                });
+                if (!documentModel) {
+                    vscode.commands.executeCommand('default:tab');
+                    return;
+                }
+
+                const blockNode = documentModel.documentTree.getNodeAtLine(line.lineNumber);
+
+                if (blockNode && blockNode.bulletRange) {
+                    const bulletEndChar = blockNode.bulletRange.end.character;
+
+                    // If cursor is exactly at the end of the bullet (e.g., "* |" or "    * |")
+                    if (position.character === bulletEndChar) {
+                        const indentSpaces = '    '; // Assuming 4 spaces for indentation
+                        await editor.edit(editBuilder => {
+                            editBuilder.insert(new vscode.Position(line.lineNumber, 0), indentSpaces);
+                        });
+                    } else {
+                        // Otherwise, insert a regular tab at the cursor position
+                        await editor.edit(editBuilder => {
+                            editBuilder.insert(position, '\t');
+                        });
+                    }
+                } else {
+                    // If no bullet, execute default tab command
+                    vscode.commands.executeCommand('default:tab');
+                }
             }),
             vscode.commands.registerTextEditorCommand('pointblank.outdent', () => {
                 vscode.commands.executeCommand('outdentLines');

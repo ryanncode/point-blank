@@ -157,8 +157,8 @@ export class BlockNode {
             { type: 'atSign', regex: /^(@)/, bulletChar: '@' }, // New: Matches '@' at the start
             { type: 'star', regex: /^(\*\s)/, bulletChar: '*' },
             { type: 'plus', regex: /^(\+\s)/, bulletChar: '+' },
-            { type: 'minus', regex: /^(-)\s/, bulletChar: '-' }, // Only matches '-'
-            { type: 'default', regex: /^(\u2022)\s/, bulletChar: '•' }, // Matches '•' (U+2022)
+            { type: 'minus', regex: /^(-\s)/, bulletChar: '-' }, // Ensure space is captured
+            { type: 'default', regex: /^(\u2022\s)/, bulletChar: '•' }, // Ensure space is captured
             { type: 'numbered', regex: /^(\d+[\.\)]\s)/, bulletChar: '1.' }, // Example bulletChar
             { type: 'blockquote', regex: /^(>\s)/, bulletChar: '>' }
         ];
