@@ -1,5 +1,4 @@
 import * as vscode from 'vscode';
-import { FoldingUtils } from '../folding/foldingUtils';
 import { ExtensionState } from '../state/extensionState';
 import { DocumentModel } from '../document/documentModel';
 import { BlockNode } from '../document/blockNode';
@@ -45,23 +44,24 @@ export async function focusModeCommand(extensionState: ExtensionState): Promise<
     }
 
     try {
-        const allFoldingRanges = await FoldingUtils.getAllFoldingRanges(document);
         const linesToFold: number[] = [];
 
-        for (const range of allFoldingRanges) {
-            let shouldFold = true;
-            // Check if any line within this folding range is in our "keep unfolded" set
-            for (let i = range.start; i <= range.end; i++) {
-                if (linesToKeepUnfolded.has(i)) {
-                    shouldFold = false;
-                    break; // No need to check further lines in this range
+        // Helper to recursively find all foldable nodes not in the "keep unfolded" path
+        const findLinesToFold = (nodes: readonly BlockNode[]) => {
+            for (const node of nodes) {
+                if (node.children.length > 0) {
+                    // If this node is not in the path to keep unfolded, and it has children, fold it.
+                    // We only fold the parent line, VS Code handles the range.
+                    if (!linesToKeepUnfolded.has(node.lineNumber)) {
+                        linesToFold.push(node.lineNumber);
+                    }
                 }
+                // Recursively check children
+                findLinesToFold(node.children);
             }
+        };
 
-            if (shouldFold) {
-                linesToFold.push(range.start);
-            }
-        }
+        findLinesToFold(documentTree.rootNodes);
 
         // Execute fold commands for the identified lines
         if (linesToFold.length > 0) {
