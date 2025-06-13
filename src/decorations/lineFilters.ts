@@ -9,20 +9,21 @@ import * as vscode from 'vscode';
  * @returns `true` if the line should be excluded, `false` otherwise.
  */
 export function isExcludedLine(line: vscode.TextLine): boolean {
-    const text = line.text.trim();
+    const text = line.text;
 
     // Markdown ATX headers: #, ##, etc.
-    if (text.match(/^#+\s/)) {
+    // Can be preceded by up to 3 spaces.
+    if (text.match(/^[ ]{0,3}#+\s/)) {
         return true;
     }
-
+    const trimmedText = text.trim();
     // Setext header underlines: === or --- (at least 3 characters)
-    if (text.match(/^[=-]{3,}$/)) {
+    if (trimmedText.match(/^[=-]{3,}$/)) {
         return true;
     }
 
     // Horizontal rules: ***, ---, ___ (at least 3 characters, with optional spaces)
-    if (text.match(/^(\* *){3,}$|^(- *){3,}$|^(_ *){3,}$/)) {
+    if (trimmedText.match(/^(\* *){3,}$|^(- *){3,}$|^(_ *){3,}$/)) {
         return true;
     }
 

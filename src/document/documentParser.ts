@@ -125,44 +125,17 @@ export class DocumentParser {
             trimmedText: node.trimmedText,
             isExcluded: node.isExcluded,
             isCodeBlockDelimiter: node.isCodeBlockDelimiter,
-            headerLevel: DocumentParser.getHeaderLevel(node.trimmedText)
+            headerLevel: DocumentParser.getHeaderLevel(node.text) // Use node.text (untrimmed)
         }));
 
         const mutableRootNodes: TempMutableNode[] = [];
         const parentStack: TempMutableNode[] = []; // Stores potential parent mutable nodes
 
-        // Pass 1: Build a Mutable Tree
+        // Pass 1: Build a Mutable Tree based on indentation only
         for (const mutableNode of mutableNodes) {
-            // Adjust parentStack based on indentation or header level
-            while (parentStack.length > 0) {
-                const lastParent = parentStack[parentStack.length - 1];
-
-                // Rule 1: If the current node is a header
-                if (mutableNode.headerLevel > 0) {
-                    // If the last parent is also a header, pop if current header level is less than or equal to parent's
-                    if (lastParent.headerLevel > 0) {
-                        if (mutableNode.headerLevel <= lastParent.headerLevel) {
-                            parentStack.pop();
-                        } else {
-                            break; // Current header is a sub-header of the last parent header
-                        }
-                    } else {
-                        // If the last parent is NOT a header, a header cannot be its child. Pop the non-header parent.
-                        parentStack.pop();
-                    }
-                } else {
-                    // Rule 2: If the current node is NOT a header (indentation-based)
-                    // If the last parent is a header, and current node is not, it's a child of the header
-                    if (lastParent.headerLevel > 0) {
-                        break;
-                    }
-                    // Otherwise, it's indentation-based
-                    if (mutableNode.indent <= lastParent.indent) {
-                        parentStack.pop();
-                    } else {
-                        break; // Current node is a child by indentation
-                    }
-                }
+            // Pop parents from stack if current node is less indented or same indentation
+            while (parentStack.length > 0 && mutableNode.indent <= parentStack[parentStack.length - 1].indent) {
+                parentStack.pop();
             }
 
             const potentialParent = parentStack.length > 0 ? parentStack[parentStack.length - 1] : undefined;
@@ -174,9 +147,9 @@ export class DocumentParser {
                 mutableRootNodes.push(mutableNode);
             }
 
-            // Only push non-excluded nodes onto the stack as potential parents
-            // and only if they are not code block delimiters.
-            if ((mutableNode.headerLevel > 0 || !mutableNode.isExcluded) && !mutableNode.isCodeBlockDelimiter) {
+            // Push current node onto stack as potential parent for subsequent nodes
+            // Only push if it's not an excluded line (like code blocks)
+            if (!mutableNode.isExcluded && !mutableNode.isCodeBlockDelimiter) {
                 parentStack.push(mutableNode);
             }
         }
@@ -227,11 +200,13 @@ export class DocumentParser {
     /**
      * Determines the header level of a given text line.
      * Returns 0 if the line is not a markdown header.
-     * @param text The trimmed text of the line.
+     * @param text The full text of the line (untrimmed).
      * @returns The header level (1-6) or 0 if not a header.
      */
     private static getHeaderLevel(text: string): number {
-        const match = text.match(/^(#+)\s/);
+        // Markdown ATX headers can be preceded by up to 3 spaces.
+        // Must be followed by a space.
+        const match = text.match(/^[ ]{0,3}(#+)\s/);
         if (match) {
             return match[1].length;
         }
