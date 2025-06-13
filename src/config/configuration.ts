@@ -72,7 +72,7 @@ export class Configuration {
                 color: configuration.get('level1Color') || new vscode.ThemeColor('editor.foreground'),
                 margin: '0 0.5em 0 0',
             },
-            rangeBehavior: vscode.DecorationRangeBehavior.ClosedOpen,
+            rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
         }));
 
         /**
