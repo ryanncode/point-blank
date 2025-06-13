@@ -10,7 +10,7 @@ import { Configuration } from '../config/configuration';
  * Manages and applies text editor decorations based on document changes.
  * It orchestrates the decoration updates in a flicker-free manner.
  */
-export class DecorationManager {
+export class DecorationManager implements vscode.Disposable {
     private _extensionState: ExtensionState;
     private _decorationTypes: Map<string, vscode.TextEditorDecorationType> = new Map();
     private _disposables: vscode.Disposable[] = [];
@@ -132,14 +132,38 @@ export class DecorationManager {
 
         const currentVisibleRanges = editor.visibleRanges;
 
-        for (const range of currentVisibleRanges) {
-            const startLine = Math.max(0, range.start.line - viewportBuffer);
-            const endLine = Math.min(editor.document.lineCount - 1, range.end.line + viewportBuffer);
+        const allNodesToDecorate: BlockNode[] = [];
+        const processedLineNumbers = new Set<number>();
 
-            const nodesInVisibleRange = tree.getNodesInLineRange(startLine, endLine);
-            DecorationCalculator.calculateDecorations(nodesInVisibleRange, decorationsToApply);
+        for (let i = 0; i < currentVisibleRanges.length; i++) {
+            const currentRange = currentVisibleRanges[i];
+
+            const startLine = Math.max(0, currentRange.start.line - viewportBuffer);
+
+            let endLine: number;
+            const bufferedEndLine = Math.min(editor.document.lineCount - 1, currentRange.end.line + viewportBuffer);
+
+            if (i + 1 < currentVisibleRanges.length) {
+                const nextRangeStartLine = currentVisibleRanges[i + 1].start.line;
+                endLine = Math.min(bufferedEndLine, nextRangeStartLine - 1);
+            } else {
+                endLine = bufferedEndLine;
+            }
+
+            // Ensure endLine doesn't go below startLine, especially for very small ranges or large buffers
+            endLine = Math.max(startLine, endLine);
+
+            const nodesInCurrentBufferedRange = tree.getNodesInLineRange(startLine, endLine);
+
+            for (const node of nodesInCurrentBufferedRange) {
+                if (!processedLineNumbers.has(node.lineNumber)) {
+                    allNodesToDecorate.push(node);
+                    processedLineNumbers.add(node.lineNumber);
+                }
+            }
         }
 
+        DecorationCalculator.calculateDecorations(allNodesToDecorate, decorationsToApply);
         // Apply the newly calculated decorations to the editor
         for (const [typeName, decorationType] of this._decorationTypes.entries()) {
             const optionsToApply = decorationsToApply.get(typeName) || [];

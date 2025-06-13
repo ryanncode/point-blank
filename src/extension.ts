@@ -117,7 +117,7 @@ export function activate(context: vscode.ExtensionContext): void {
     }));
 
     // Add DecorationManager to disposables
-    context.subscriptions.push(decorationManager);
+    context.subscriptions.push(decorationManager as vscode.Disposable);
 }
 
 /**
