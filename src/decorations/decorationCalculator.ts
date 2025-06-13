@@ -69,9 +69,6 @@ export class DecorationCalculator {
                     break;
                 }
                 case 'default': {
-                    if (node.bulletRange) {
-                        decorationsMap.get('bulletDecorationType')!.push({ range: node.bulletRange });
-                    }
                     break;
                 }
             }

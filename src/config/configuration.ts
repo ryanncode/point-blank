@@ -62,14 +62,6 @@ export class Configuration {
         // Dispose existing decorations if they exist to prevent memory leaks
         this._extensionState.disposeDecorationTypes();
 
-        /**
-         * Defines the decoration type for the default bullet points.
-         * These are typically used for general list items.
-         */
-        this._extensionState.setDecorationType('bulletDecorationType', vscode.window.createTextEditorDecorationType({
-            color: '#FFFFFF',
-            rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
-        }));
 
         /**
          * Defines the decoration type for custom bullet points using an asterisk (*).

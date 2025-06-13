@@ -40,7 +40,6 @@ export class DecorationManager implements vscode.Disposable {
 
     private initializeDecorationTypesInternal(): void {
         const decorationTypeNames = [
-            'bulletDecorationType',
             'starBulletDecorationType',
             'plusBulletDecorationType',
             'minusBulletDecorationType',

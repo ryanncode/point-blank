@@ -9,7 +9,6 @@ import { ExtensionState } from '../state/extensionState';
 
 const extensionState = ExtensionState.getInstance();
 
-export const bulletDecorationType = extensionState.getDecorationType('bulletDecorationType') as vscode.TextEditorDecorationType;
 export const starBulletDecorationType = extensionState.getDecorationType('starBulletDecorationType') as vscode.TextEditorDecorationType;
 export const plusBulletDecorationType = extensionState.getDecorationType('plusBulletDecorationType') as vscode.TextEditorDecorationType;
 export const minusBulletDecorationType = extensionState.getDecorationType('minusBulletDecorationType') as vscode.TextEditorDecorationType;
