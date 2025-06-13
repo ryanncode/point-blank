@@ -24,6 +24,7 @@ export class BlockNode {
     public readonly typedNodeRange?: vscode.Range; // Range of the typed node (e.g., "(Book)")
     public readonly isCodeBlockDelimiter: boolean; // To handle code blocks
     public readonly isExcluded: boolean; // To handle excluded lines (e.g., Markdown headers)
+    public readonly bulletType: 'default' | 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'none';
 
     // Hierarchical properties
     public readonly parent?: BlockNode;
@@ -34,7 +35,8 @@ export class BlockNode {
         lineNumber: number,
         isExcluded: boolean, // Determined by parser based on code blocks, etc.
         parent?: BlockNode,
-        children: BlockNode[] = []
+        children: BlockNode[] = [],
+        bulletType: 'default' | 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'none' = 'none'
     ) {
         this.line = line;
         this.lineNumber = lineNumber;
@@ -54,13 +56,17 @@ export class BlockNode {
         this.type = parsedProps.type;
         this.typedNodeRange = parsedProps.typedNodeRange;
         this.isCodeBlockDelimiter = parsedProps.isCodeBlockDelimiter;
+        this.bulletType = bulletType;
+        if (bulletType === 'none') {
+            this.bulletType = this.determineBulletType(this.trimmedText, this.isCodeBlockDelimiter, this.isExcluded);
+        }
     }
 
     /**
      * Parses the content of the line to determine its properties.
      * This method is internal and should only be called during construction.
      */
-    private parseLineContent(lineTextFromNonWhitespace: string): {
+    private parseLineContent(trimmedText: string): {
         isKeyValue: boolean;
         keyValue?: KeyValueProperty;
         isTypedNode: boolean;
@@ -76,12 +82,12 @@ export class BlockNode {
         let isCodeBlockDelimiter = false;
 
         // Check for code block delimiter
-        if (this.trimmedText.startsWith('```')) {
+        if (trimmedText.startsWith('```')) {
             isCodeBlockDelimiter = true;
         }
 
         // Check for Key:: Value pattern
-        const keyValueMatch = lineTextFromNonWhitespace.match(/^(-\s*)?(\S+::)\s*(.*)/);
+        const keyValueMatch = trimmedText.match(/^(-\s*)?(\S+::)\s*(.*)/);
         if (keyValueMatch) {
             isKeyValue = true;
             const leadingDash = keyValueMatch[1] || ''; // Capture group 1: optional "- "
@@ -99,7 +105,7 @@ export class BlockNode {
         }
 
         // Check for Typed Node pattern: - (TypeName)
-        const typedNodeMatch = lineTextFromNonWhitespace.match(/^\s*\((.+)\)/);
+        const typedNodeMatch = trimmedText.match(/^\s*\((.+)\)/);
         if (typedNodeMatch) {
             isTypedNode = true;
             type = typedNodeMatch[1];
@@ -119,6 +125,26 @@ export class BlockNode {
     }
 
     /**
+     * Determines the bullet type based on the trimmed line content.
+     */
+    private determineBulletType(trimmedText: string, isCodeBlockDelimiter: boolean, isExcluded: boolean): 'default' | 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'none' {
+        if (trimmedText.startsWith('* ')) {
+            return 'star';
+        } else if (trimmedText.startsWith('+ ')) {
+            return 'plus';
+        } else if (trimmedText.startsWith('- ')) {
+            return 'minus';
+        } else if (trimmedText.match(/^\d+\.\s/) || trimmedText.match(/^\d+\)\s/)) {
+            return 'numbered';
+        } else if (trimmedText.startsWith('> ')) {
+            return 'blockquote';
+        } else if (trimmedText.length > 0 && !isCodeBlockDelimiter && !isExcluded) {
+            return 'default';
+        }
+        return 'none';
+    }
+
+    /**
      * Creates a new BlockNode with updated children.
      * This is useful for maintaining immutability when the tree structure changes.
      */
@@ -128,7 +154,8 @@ export class BlockNode {
             this.lineNumber,
             this.isExcluded,
             this.parent,
-            newChildren
+            newChildren,
+            this.bulletType
         );
     }
 
@@ -141,7 +168,8 @@ export class BlockNode {
             this.lineNumber,
             this.isExcluded,
             newParent,
-            Array.from(this.children) // Ensure children array is copied
+            Array.from(this.children), // Ensure children array is copied
+            this.bulletType
         );
     }
 
@@ -155,6 +183,7 @@ export class BlockNode {
                this.isKeyValue !== otherNode.isKeyValue ||
                this.isTypedNode !== otherNode.isTypedNode ||
                this.isCodeBlockDelimiter !== otherNode.isCodeBlockDelimiter ||
-               this.isExcluded !== otherNode.isExcluded;
+               this.isExcluded !== otherNode.isExcluded ||
+               this.bulletType !== otherNode.bulletType;
     }
 }
