@@ -13,9 +13,8 @@ import { quickOpenFileCommand } from './commands/quickOpenFile';
 import { TemplateService } from './templates/templateService';
 import { DocumentModel } from './document/documentModel';
 import { DecorationManager } from './decorations/decorationManager';
-import { CommandManager } from './commands/commandManager'; // New import
+import { CommandManager } from './commands/commandManager';
 import { InlineCompletionProvider } from './providers/inlineCompletionProvider';
-import { registerBulletInserter } from './bullets/bulletInserter'; // This import will be removed after the file is deleted
 
 /**
  * Activates the Point Blank extension.
@@ -41,6 +40,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
     // Register CommandManager listeners and overrides
     commandManager.register(context);
+
 
     // Initialize InlineCompletionProvider
     context.subscriptions.push(new InlineCompletionProvider(context));
@@ -107,6 +107,31 @@ export function activate(context: vscode.ExtensionContext): void {
             }
         }
     }, null, context.subscriptions);
+
+    // Listen for selection changes to update the 'pointblank.lineHasBullet' context
+    context.subscriptions.push(vscode.window.onDidChangeTextEditorSelection(event => {
+        const editor = event.textEditor;
+        if (!editor) {
+            return;
+        }
+
+        const documentModel = extensionState.getDocumentModel(editor.document.uri.toString());
+        if (!documentModel) {
+            return;
+        }
+
+        const selection = editor.selection;
+        let lineHasBullet = false;
+
+        if (selection.isSingleLine) {
+            const line = editor.document.lineAt(selection.active.line);
+            const blockNode = documentModel.documentTree.getNodeAtLine(line.lineNumber);
+            if (blockNode && blockNode.bulletRange) {
+                lineHasBullet = true;
+            }
+        }
+        vscode.commands.executeCommand('setContext', 'pointblank.lineHasBullet', lineHasBullet);
+    }));
 
     // Listen for document close events to dispose of DocumentModel instances
     context.subscriptions.push(vscode.workspace.onDidCloseTextDocument(document => {

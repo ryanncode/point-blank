@@ -35,6 +35,10 @@
       {
         "command": "pointblank.expandTemplate",
         "title": "Point Blank: Expand Template Inline"
+      },
+      {
+        "command": "pointblank.tab",
+        "title": "Point Blank: Handle Tab Key"
       }
     ],
     "keybindings": [
@@ -60,6 +64,11 @@
         "key": "alt+n",
         "mac": "alt+n",
         "when": "editorTextFocus"
+      },
+      {
+        "command": "pointblank.tab",
+        "key": "tab",
+        "when": "editorTextFocus && pointblank.lineHasBullet"
       }
     ],
     "configuration": {

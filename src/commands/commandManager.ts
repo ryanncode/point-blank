@@ -116,8 +116,14 @@ export class CommandManager {
                 // Default cursorRight behavior
                 vscode.commands.executeCommand('default:cursorRight');
             }),
-            vscode.commands.registerTextEditorCommand('pointblank.tab', () => {
-                vscode.commands.executeCommand('indentLines');
+            vscode.commands.registerTextEditorCommand('pointblank.tab', async (editor) => {
+                const position = editor.selection.active;
+                const line = editor.document.lineAt(position.line);
+                const indentSpaces = '    '; // Assuming 4 spaces for indentation
+
+                await editor.edit(editBuilder => {
+                    editBuilder.insert(new vscode.Position(line.lineNumber, 0), indentSpaces);
+                });
             }),
             vscode.commands.registerTextEditorCommand('pointblank.outdent', () => {
                 vscode.commands.executeCommand('outdentLines');

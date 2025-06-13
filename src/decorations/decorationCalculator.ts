@@ -64,6 +64,14 @@ export class DecorationCalculator {
                     }
                     break;
                 }
+                case 'atSign': {
+                    // No decoration for '@' as per requirement
+                    break;
+                }
+                case 'atSign': {
+                    // No decoration for '@' as per requirement
+                    break;
+                }
                 case 'default': {
                     if (node.bulletRange) {
                         decorationsMap.get('bulletDecorationType')!.push({ range: node.bulletRange });

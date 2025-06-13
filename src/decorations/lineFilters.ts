@@ -27,5 +27,11 @@ export function isExcludedLine(line: vscode.TextLine): boolean {
         return true;
     }
 
+    // Typed node trigger: @TypeName
+    // Matches lines starting with @ followed by zero or more word characters.
+    if (text.match(/^\s*@\w*$/)) {
+        return true;
+    }
+
     return false;
 }

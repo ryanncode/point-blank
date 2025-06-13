@@ -24,7 +24,7 @@ export class BlockNode {
     public readonly typedNodeRange?: vscode.Range; // Range of the typed node (e.g., "(Book)")
     public readonly isCodeBlockDelimiter: boolean; // To handle code blocks
     public readonly isExcluded: boolean; // To handle excluded lines (e.g., Markdown headers)
-    public readonly bulletType: 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'default' | 'none';
+    public readonly bulletType: 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'default' | 'none' | 'atSign';
     public readonly bulletRange?: vscode.Range;
 
     // Hierarchical properties
@@ -37,7 +37,7 @@ export class BlockNode {
         isExcluded: boolean, // Determined by parser based on code blocks, etc.
         parent?: BlockNode,
         children: BlockNode[] = [],
-        bulletType: 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'default' | 'none' = 'none',
+        bulletType: 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'default' | 'none' | 'atSign' = 'none',
         bulletRange?: vscode.Range
     ) {
         this.line = line;
@@ -145,7 +145,7 @@ export class BlockNode {
         isCodeBlockDelimiter: boolean,
         isExcluded: boolean,
         lineNumber: number
-    ): { bulletType: 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'default' | 'none'; bulletRange?: vscode.Range } {
+    ): { bulletType: 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'default' | 'none' | 'atSign'; bulletRange?: vscode.Range } {
         if (isCodeBlockDelimiter || isExcluded) {
             return { bulletType: 'none' };
         }
@@ -154,6 +154,7 @@ export class BlockNode {
 
         // Regex for common bullet types and their ranges
         const bulletPatterns = [
+            { type: 'atSign', regex: /^(@)/, bulletChar: '@' }, // New: Matches '@' at the start
             { type: 'star', regex: /^(\*\s)/, bulletChar: '*' },
             { type: 'plus', regex: /^(\+\s)/, bulletChar: '+' },
             { type: 'minus', regex: /^(-)\s/, bulletChar: '-' }, // Only matches '-'
@@ -186,7 +187,7 @@ export class BlockNode {
             this.isExcluded,
             this.parent,
             newChildren,
-            this.bulletType as 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'default' | 'none',
+            this.bulletType as 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'default' | 'none' | 'atSign',
             this.bulletRange
         );
     }
@@ -201,7 +202,7 @@ export class BlockNode {
             this.isExcluded,
             newParent,
             Array.from(this.children), // Ensure children array is copied
-            this.bulletType as 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'default' | 'none',
+            this.bulletType as 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'default' | 'none' | 'atSign',
             this.bulletRange
         );
     }
