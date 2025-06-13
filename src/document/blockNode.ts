@@ -47,7 +47,7 @@ export class BlockNode {
 
         const lineTextFromNonWhitespace = this.text.substring(this.indent);
 
-        const parsedProps = this.parseLineContent(lineTextFromNonWhitespace);
+        const parsedProps = this.parseLineContent(this.trimmedText);
         this.isKeyValue = parsedProps.isKeyValue;
         this.keyValue = parsedProps.keyValue;
         this.isTypedNode = parsedProps.isTypedNode;
