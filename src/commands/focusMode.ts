@@ -41,11 +41,6 @@ export async function focusModeCommand(extensionState: ExtensionState): Promise<
     // Add the current node and all its ancestors to the set of lines to keep unfolded
     while (tempNode) {
         linesToKeepUnfolded.add(tempNode.lineNumber);
-        // A top-level header block with '#' is a root node.
-        // If it's a root node and starts with '#', we stop here.
-        if (!tempNode.parent && tempNode.trimmedText.startsWith('#')) {
-            break;
-        }
         tempNode = tempNode.parent;
     }
 

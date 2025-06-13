@@ -101,41 +101,72 @@ export class DocumentParser {
     }
 
     /**
-     * Reconstructs the parent/child hierarchy from a flat list of nodes based on indentation.
+     * Reconstructs the parent/child hierarchy from a flat list of nodes based on indentation and header levels.
      */
     private buildTreeFromFlatList(nodes: BlockNode[]): BlockNode[] {
         const rootNodes: BlockNode[] = [];
-        const parentStack: BlockNode[] = [];
+        const parentStack: BlockNode[] = []; // Stores potential parent nodes
 
         for (const node of nodes) {
-            // Find the correct parent for the current node based on indentation
-            while (parentStack.length > 0 && node.indent <= parentStack[parentStack.length - 1].indent) {
-                parentStack.pop();
+            const nodeHeaderLevel = DocumentParser.getHeaderLevel(node.trimmedText);
+
+            // Adjust parentStack based on indentation or header level
+            while (parentStack.length > 0) {
+                const lastParent = parentStack[parentStack.length - 1];
+                const lastParentHeaderLevel = DocumentParser.getHeaderLevel(lastParent.trimmedText);
+
+                if (nodeHeaderLevel > 0 && lastParentHeaderLevel > 0) {
+                    // Both are headers: pop if current node's level is less than or equal to parent's
+                    if (nodeHeaderLevel <= lastParentHeaderLevel) {
+                        parentStack.pop();
+                    } else {
+                        break; // Current header is a sub-header of the last parent header
+                    }
+                } else if (node.indent <= lastParent.indent) {
+                    // Indentation-based: pop if current node's indent is less than or equal to parent's
+                    parentStack.pop();
+                } else {
+                    break; // Current node is a child by indentation
+                }
             }
 
             const parent = parentStack.length > 0 ? parentStack[parentStack.length - 1] : undefined;
 
             // Create a new node with the correct parent
+            // Note: BlockNode's children array is readonly, so we need to reconstruct parents
+            // if we were truly aiming for full immutability here. For this context,
+            // we'll assume the direct manipulation of children (via casting) is acceptable
+            // for the purpose of demonstrating the tree building logic.
             const newNode = new BlockNode(node.line, node.lineNumber, node.isExcluded, parent);
 
             if (parent) {
-                // This is tricky with immutability. A better approach would be to
-                // collect children and then construct the parent with them.
-                // For now, we will directly manipulate a children array for simplicity here,
-                // and then reconstruct the parent.
-                const parentChildren = (parent.children as BlockNode[]);
-                parentChildren.push(newNode);
+                // This cast is a simplification. In a truly immutable design,
+                // the parent would need to be recreated with the new child.
+                (parent.children as BlockNode[]).push(newNode);
             } else {
                 rootNodes.push(newNode);
             }
 
-            parentStack.push(newNode);
+            // Only push non-excluded nodes onto the stack as potential parents
+            // and only if they are not code block delimiters.
+            if (!newNode.isExcluded && !newNode.isCodeBlockDelimiter) {
+                parentStack.push(newNode);
+            }
         }
-
-        // This is a simplified reconstruction. A full implementation would need to
-        // properly handle the immutable nature of BlockNode by recreating parent nodes
-        // with their new children lists. For this implementation, we'll assume the
-        // direct manipulation is acceptable for the sake of demonstrating the logic.
         return rootNodes;
+    }
+
+    /**
+     * Determines the header level of a given text line.
+     * Returns 0 if the line is not a markdown header.
+     * @param text The trimmed text of the line.
+     * @returns The header level (1-6) or 0 if not a header.
+     */
+    private static getHeaderLevel(text: string): number {
+        const match = text.match(/^(#+)\s/);
+        if (match) {
+            return match[1].length;
+        }
+        return 0;
     }
 }
