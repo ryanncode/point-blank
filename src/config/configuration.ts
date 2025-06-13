@@ -67,11 +67,7 @@ export class Configuration {
          * These are typically used for general list items.
          */
         this._extensionState.setDecorationType('bulletDecorationType', vscode.window.createTextEditorDecorationType({
-            before: {
-                contentText: '•',
-                color: configuration.get('level1Color') || new vscode.ThemeColor('editor.foreground'),
-                margin: '0 0.5em 0 0',
-            },
+            color: '#FFFFFF',
             rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
         }));
 
@@ -81,6 +77,7 @@ export class Configuration {
          */
         this._extensionState.setDecorationType('starBulletDecorationType', vscode.window.createTextEditorDecorationType({
             color: configuration.get('level2Color') || new vscode.ThemeColor('editorWarning.foreground'),
+            rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
         }));
 
         /**
@@ -89,6 +86,7 @@ export class Configuration {
          */
         this._extensionState.setDecorationType('plusBulletDecorationType', vscode.window.createTextEditorDecorationType({
             color: configuration.get('level3Color') || new vscode.ThemeColor('editorGutter.addedBackground'),
+            rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
         }));
 
         /**
@@ -97,6 +95,7 @@ export class Configuration {
          */
         this._extensionState.setDecorationType('minusBulletDecorationType', vscode.window.createTextEditorDecorationType({
             color: configuration.get('level4Color') || new vscode.ThemeColor('editorGutter.deletedBackground'),
+            rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
         }));
 
         /**
@@ -105,6 +104,7 @@ export class Configuration {
          */
         this._extensionState.setDecorationType('numberedBulletDecorationType', vscode.window.createTextEditorDecorationType({
             color: configuration.get('level5Color') || new vscode.ThemeColor('editorBracketHighlight.foreground3'),
+            rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
         }));
 
         /**

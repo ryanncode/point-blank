@@ -34,41 +34,39 @@ export class DecorationCalculator {
             const firstChar = node.text.charAt(firstCharIndex);
 
             switch (node.bulletType) {
-                case 'blockquote': {
-                    const range = new vscode.Range(node.lineNumber, firstCharIndex, node.lineNumber, firstCharIndex + 1);
-                    decorationsMap.get('blockquoteDecorationType')!.push({ range });
-                    break;
-                }
-                case 'star': {
-                    const range = new vscode.Range(node.lineNumber, firstCharIndex, node.lineNumber, firstCharIndex + 1);
-                    decorationsMap.get('starBulletDecorationType')!.push({ range });
-                    break;
-                }
-                case 'plus': {
-                    const range = new vscode.Range(node.lineNumber, firstCharIndex, node.lineNumber, firstCharIndex + 1);
-                    decorationsMap.get('plusBulletDecorationType')!.push({ range });
-                    break;
-                }
-                case 'minus': {
-                    const range = new vscode.Range(node.lineNumber, firstCharIndex, node.lineNumber, firstCharIndex + 1);
-                    decorationsMap.get('minusBulletDecorationType')!.push({ range });
-                    break;
-                }
+                case 'blockquote':
+                case 'star':
+                case 'plus':
+                case 'minus':
                 case 'numbered': {
-                    // Re-calculate the length of the numbered bullet prefix
-                    const numberedMatch = node.trimmedText.match(/^(\d+[\.\)])\s*/);
-                    if (numberedMatch) {
-                        const range = new vscode.Range(node.lineNumber, firstCharIndex, node.lineNumber, firstCharIndex + numberedMatch[1].length);
-                        decorationsMap.get('numberedBulletDecorationType')!.push({ range });
+                    if (node.bulletRange) {
+                        let decorationType: string;
+                        switch (node.bulletType) {
+                            case 'blockquote':
+                                decorationType = 'blockquoteDecorationType';
+                                break;
+                            case 'star':
+                                decorationType = 'starBulletDecorationType';
+                                break;
+                            case 'plus':
+                                decorationType = 'plusBulletDecorationType';
+                                break;
+                            case 'minus':
+                                decorationType = 'minusBulletDecorationType';
+                                break;
+                            case 'numbered':
+                                decorationType = 'numberedBulletDecorationType';
+                                break;
+                            default:
+                                continue; // Should not happen
+                        }
+                        decorationsMap.get(decorationType)!.push({ range: node.bulletRange });
                     }
                     break;
                 }
-                case 'implicit': {
-                    // Default bullet point for any line that is not otherwise decorated, but only if it has content
-                    if (node.trimmedText.length > 0) {
-                        // Set range to zero-width at the start of the line's content
-                        const range = new vscode.Range(node.lineNumber, firstCharIndex, node.lineNumber, firstCharIndex);
-                        decorationsMap.get('bulletDecorationType')!.push({ range });
+                case 'default': {
+                    if (node.bulletRange) {
+                        decorationsMap.get('bulletDecorationType')!.push({ range: node.bulletRange });
                     }
                     break;
                 }

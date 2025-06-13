@@ -31,7 +31,7 @@ export class DocumentParser {
             }
             isLineExcluded = isLineExcluded || currentInCodeBlock;
 
-            const newNode = new BlockNode(line, i, isLineExcluded);
+            const newNode = new BlockNode(line, i, isLineExcluded, undefined, [], 'none', undefined);
             flatNodes.push(newNode);
         }
 
@@ -95,7 +95,7 @@ export class DocumentParser {
             }
             isLineExcluded = isLineExcluded || currentInCodeBlock;
 
-            const newNode = new BlockNode(line, i, isLineExcluded);
+            const newNode = new BlockNode(line, i, isLineExcluded, undefined, [], 'none', undefined);
             nodes.push(newNode);
         }
         return nodes;
@@ -171,7 +171,9 @@ export class DocumentParser {
                 mutableNode.lineNumber,
                 mutableNode.isExcluded,
                 undefined, // Parent will be set by its own parent's conversion
-                immutableChildren
+                immutableChildren,
+                mutableNode.original.bulletType, // Pass existing bulletType
+                mutableNode.original.bulletRange // Pass existing bulletRange
             );
 
             immutableNodeMap.set(mutableNode, immutableBlockNode);

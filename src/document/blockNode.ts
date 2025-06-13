@@ -24,7 +24,8 @@ export class BlockNode {
     public readonly typedNodeRange?: vscode.Range; // Range of the typed node (e.g., "(Book)")
     public readonly isCodeBlockDelimiter: boolean; // To handle code blocks
     public readonly isExcluded: boolean; // To handle excluded lines (e.g., Markdown headers)
-    public readonly bulletType: 'implicit' | 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'none';
+    public readonly bulletType: 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'default' | 'none';
+    public readonly bulletRange?: vscode.Range;
 
     // Hierarchical properties
     public readonly parent?: BlockNode;
@@ -36,7 +37,8 @@ export class BlockNode {
         isExcluded: boolean, // Determined by parser based on code blocks, etc.
         parent?: BlockNode,
         children: BlockNode[] = [],
-        bulletType: 'implicit' | 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'none' = 'none'
+        bulletType: 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'default' | 'none' = 'none',
+        bulletRange?: vscode.Range
     ) {
         this.line = line;
         this.lineNumber = lineNumber;
@@ -47,8 +49,6 @@ export class BlockNode {
         this.parent = parent;
         this.children = children;
 
-        const lineTextFromNonWhitespace = this.text.substring(this.indent);
-
         const parsedProps = this.parseLineContent(this.trimmedText);
         this.isKeyValue = parsedProps.isKeyValue;
         this.keyValue = parsedProps.keyValue;
@@ -56,9 +56,15 @@ export class BlockNode {
         this.type = parsedProps.type;
         this.typedNodeRange = parsedProps.typedNodeRange;
         this.isCodeBlockDelimiter = parsedProps.isCodeBlockDelimiter;
-        this.bulletType = bulletType;
-        if (bulletType === 'none') {
-            this.bulletType = this.determineBulletType(this.trimmedText, this.isCodeBlockDelimiter, this.isExcluded);
+
+        // If bulletType and bulletRange are not explicitly provided, determine them
+        if (bulletType === 'none' || bulletRange === undefined) {
+            const determinedBullet = this.determineBulletType(this.text, this.indent, this.isCodeBlockDelimiter, this.isExcluded, this.lineNumber);
+            this.bulletType = determinedBullet.bulletType;
+            this.bulletRange = determinedBullet.bulletRange;
+        } else {
+            this.bulletType = bulletType;
+            this.bulletRange = bulletRange;
         }
     }
 
@@ -125,23 +131,48 @@ export class BlockNode {
     }
 
     /**
-     * Determines the bullet type based on the trimmed line content.
+     * Determines the bullet type and its range based on the line content.
+     * @param lineText The full text of the line.
+     * @param indent The first non-whitespace character index of the line.
+     * @param isCodeBlockDelimiter True if the line is a code block delimiter.
+     * @param isExcluded True if the line is excluded from normal parsing (e.g., markdown header).
+     * @param lineNumber The line number.
+     * @returns An object containing the bulletType and its vscode.Range, or 'none' and undefined range.
      */
-    private determineBulletType(trimmedText: string, isCodeBlockDelimiter: boolean, isExcluded: boolean): 'implicit' | 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'none' {
-        if (trimmedText.startsWith('* ')) {
-            return 'star';
-        } else if (trimmedText.startsWith('+ ')) {
-            return 'plus';
-        } else if (trimmedText.startsWith('- ')) {
-            return 'minus';
-        } else if (trimmedText.match(/^\d+\.\s/) || trimmedText.match(/^\d+\)\s/)) {
-            return 'numbered';
-        } else if (trimmedText.startsWith('> ')) {
-            return 'blockquote';
-        } else if (trimmedText.length > 0 && !isCodeBlockDelimiter && !isExcluded) {
-            return 'implicit';
+    private determineBulletType(
+        lineText: string,
+        indent: number,
+        isCodeBlockDelimiter: boolean,
+        isExcluded: boolean,
+        lineNumber: number
+    ): { bulletType: 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'default' | 'none'; bulletRange?: vscode.Range } {
+        if (isCodeBlockDelimiter || isExcluded) {
+            return { bulletType: 'none' };
         }
-        return 'none';
+
+        const textAfterIndent = lineText.substring(indent);
+
+        // Regex for common bullet types and their ranges
+        const bulletPatterns = [
+            { type: 'star', regex: /^(\*\s)/, bulletChar: '*' },
+            { type: 'plus', regex: /^(\+\s)/, bulletChar: '+' },
+            { type: 'minus', regex: /^(-)\s/, bulletChar: '-' }, // Only matches '-'
+            { type: 'default', regex: /^(\u2022)\s/, bulletChar: '•' }, // Matches '•' (U+2022)
+            { type: 'numbered', regex: /^(\d+[\.\)]\s)/, bulletChar: '1.' }, // Example bulletChar
+            { type: 'blockquote', regex: /^(>\s)/, bulletChar: '>' }
+        ];
+
+        for (const pattern of bulletPatterns) {
+            const match = textAfterIndent.match(pattern.regex);
+            if (match) {
+                const bulletStart = indent;
+                const bulletEnd = indent + match[1].length;
+                const bulletRange = new vscode.Range(lineNumber, bulletStart, lineNumber, bulletEnd);
+                return { bulletType: pattern.type as any, bulletRange };
+            }
+        }
+
+        return { bulletType: 'none' };
     }
 
     /**
@@ -155,7 +186,8 @@ export class BlockNode {
             this.isExcluded,
             this.parent,
             newChildren,
-            this.bulletType
+            this.bulletType as 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'default' | 'none',
+            this.bulletRange
         );
     }
 
@@ -169,7 +201,8 @@ export class BlockNode {
             this.isExcluded,
             newParent,
             Array.from(this.children), // Ensure children array is copied
-            this.bulletType
+            this.bulletType as 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'default' | 'none',
+            this.bulletRange
         );
     }
 
@@ -184,6 +217,10 @@ export class BlockNode {
                this.isTypedNode !== otherNode.isTypedNode ||
                this.isCodeBlockDelimiter !== otherNode.isCodeBlockDelimiter ||
                this.isExcluded !== otherNode.isExcluded ||
-               this.bulletType !== otherNode.bulletType;
+               this.bulletType !== otherNode.bulletType ||
+               // Compare bulletRange:
+               (this.bulletRange === undefined && otherNode.bulletRange !== undefined) ||
+               (this.bulletRange !== undefined && otherNode.bulletRange === undefined) ||
+               (this.bulletRange !== undefined && otherNode.bulletRange !== undefined && !this.bulletRange.isEqual(otherNode.bulletRange));
     }
 }

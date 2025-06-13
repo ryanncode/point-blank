@@ -31,8 +31,6 @@ export class DecorationManager implements vscode.Disposable {
         const debounceDelay = configuration.getDebounceDelay();
         this._debouncedUpdateDecorations = debounce(this.applyDecorationsInternal.bind(this), debounceDelay);
 
-        // Listen for selection changes (for cursor positioning)
-        vscode.window.onDidChangeTextEditorSelection(this.onDidChangeTextEditorSelection, this, this._disposables);
         // Listen for visible range changes (for viewport-aware rendering)
         vscode.window.onDidChangeTextEditorVisibleRanges(this.onDidChangeTextEditorVisibleRanges, this, this._disposables);
     }
@@ -84,48 +82,6 @@ export class DecorationManager implements vscode.Disposable {
     // Removed onDidChangeTextEditorVisibleRanges as it's now handled by the unified updateDecorations
     // and the debounced nature of applyDecorationsInternal.
 
-    private onDidChangeTextEditorSelection(event: vscode.TextEditorSelectionChangeEvent): void {
-        const activeEditor = this._extensionState.activeEditor;
-        if (activeEditor && event.textEditor === activeEditor) {
-            // Handle cursor positioning to prevent typing before bullet points
-            const editor = event.textEditor;
-            const document = editor.document;
-            const selection = editor.selection;
-
-            if (selection.isEmpty) { // Only act if there's a single cursor
-                const currentLine = document.lineAt(selection.active.line);
-                const firstCharIndex = currentLine.firstNonWhitespaceCharacterIndex;
-                const documentModel = this._extensionState.getDocumentModel(document.uri.toString());
-                const node = documentModel?.documentTree.getNodeAtLine(selection.active.line); // Fixed: getNodeByLineNumber to getNodeAtLine
-
-                if (node) {
-                    let bulletEndPosition = -1;
-                    switch (node.bulletType) {
-                        case 'star':
-                        case 'plus':
-                        case 'minus':
-                        case 'blockquote':
-                            bulletEndPosition = firstCharIndex + 1; // For single character bullets
-                            break;
-                        case 'numbered':
-                            const numberedMatch = node.trimmedText.match(/^(\d+[\.\)])\s*/);
-                            if (numberedMatch) {
-                                bulletEndPosition = firstCharIndex + numberedMatch[1].length;
-                            }
-                            break;
-                        case 'implicit':
-                            bulletEndPosition = firstCharIndex; // For default, cursor should be at the start of content
-                            break;
-                    }
-
-                    if (bulletEndPosition !== -1 && selection.active.character < bulletEndPosition) {
-                        const newPosition = new vscode.Position(selection.active.line, bulletEndPosition);
-                        editor.selection = new vscode.Selection(newPosition, newPosition); // Fixed: selection.active.line, bulletEndPosition to newPosition, newPosition
-                    }
-                }
-            }
-        }
-    }
 
     /**
      * Internal method to calculate and apply decorations. This is the core

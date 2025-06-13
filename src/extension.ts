@@ -12,8 +12,10 @@ import { expandTemplateCommand } from './commands/expandTemplate';
 import { quickOpenFileCommand } from './commands/quickOpenFile';
 import { TemplateService } from './templates/templateService';
 import { DocumentModel } from './document/documentModel';
-import { DecorationManager } from './decorations/decorationManager'; // New import
+import { DecorationManager } from './decorations/decorationManager';
+import { CommandManager } from './commands/commandManager'; // New import
 import { InlineCompletionProvider } from './providers/inlineCompletionProvider';
+import { registerBulletInserter } from './bullets/bulletInserter'; // This import will be removed after the file is deleted
 
 /**
  * Activates the Point Blank extension.
@@ -30,11 +32,15 @@ export function activate(context: vscode.ExtensionContext): void {
     const extensionState = ExtensionState.getInstance();
     const configuration = Configuration.getInstance();
     const templateService = TemplateService.getInstance();
-    const decorationManager = new DecorationManager(); // Instantiate DecorationManager
+    const decorationManager = new DecorationManager();
+    const commandManager = new CommandManager(extensionState); // Instantiate CommandManager
 
     // Initialize decorations based on current configuration
     configuration.initializeDecorationTypes();
     decorationManager.initialize(); // Initialize DecorationManager after types are set
+
+    // Register CommandManager listeners and overrides
+    commandManager.register(context);
 
     // Initialize InlineCompletionProvider
     context.subscriptions.push(new InlineCompletionProvider(context));
