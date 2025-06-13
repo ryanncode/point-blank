@@ -7,7 +7,7 @@ import { ExtensionState } from './state/extensionState';
 import { Configuration } from './config/configuration';
 import { focusModeCommand } from './commands/focusMode';
 import { unfocusModeCommand } from './commands/unfocusMode';
-import { handleEnterKeyCommand } from './commands/handleEnterKey';
+import { EnterKeyHandler } from './commands/handleEnterKey';
 import { expandTemplateCommand } from './commands/expandTemplate';
 import { quickOpenFileCommand } from './commands/quickOpenFile';
 import { TemplateService } from './templates/templateService';
@@ -54,7 +54,7 @@ export function activate(context: vscode.ExtensionContext): void {
     context.subscriptions.push(vscode.commands.registerCommand('pointblank.unfocusMode', unfocusModeCommand));
 
     // Register custom Enter key command
-    context.subscriptions.push(vscode.commands.registerCommand('pointblank.handleEnterKey', handleEnterKeyCommand));
+    context.subscriptions.push(vscode.commands.registerCommand('pointblank.handleEnterKey', EnterKeyHandler.handleEnterKeyCommand));
 
     // Register the new template expansion command
     context.subscriptions.push(vscode.commands.registerCommand('pointblank.expandTemplate', expandTemplateCommand));
