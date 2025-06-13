@@ -35,14 +35,22 @@ export class CommandManager {
                 const line = editor.document.lineAt(selection.active.line);
                 const blockNode = documentTree.getNodeAtLine(line.lineNumber);
 
-                if (blockNode && blockNode.bulletRange) {
-                    const bulletEndChar = blockNode.bulletRange.end.character;
-                    if (selection.active.character <= bulletEndChar) {
-                        // Prevent cursor from entering or being before the bullet
-                        const newPosition = new vscode.Position(line.lineNumber, bulletEndChar);
-                        editor.selection = new vscode.Selection(newPosition, newPosition);
-                    }
-                }
+if (blockNode && blockNode.bulletRange) {
+    const bulletEndChar = blockNode.bulletRange.end.character;
+    const activePosition = editor.selection.active;
+
+    if (activePosition.character < bulletEndChar) {
+        if (editor.selection.isEmpty) {
+            // It's a cursor, not a selection. Move it to the boundary.
+            const newPosition = new vscode.Position(activePosition.line, bulletEndChar);
+            editor.selection = new vscode.Selection(newPosition, newPosition);
+        } else {
+            // It's a selection. Adjust the active end to the boundary.
+            const newActivePosition = new vscode.Position(activePosition.line, bulletEndChar);
+            editor.selection = new vscode.Selection(editor.selection.anchor, newActivePosition);
+        }
+    }
+}
             })
         );
 
