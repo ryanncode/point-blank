@@ -14,6 +14,7 @@ import { quickOpenFileCommand } from './commands/quickOpenFile';
 import { TemplateService } from './templates/templateService';
 import { DocumentModel } from './document/documentModel';
 import { DecorationManager } from './decorations/decorationManager'; // New import
+import { InlineCompletionProvider } from './providers/inlineCompletionProvider';
 
 /**
  * Activates the Point Blank extension.
@@ -35,6 +36,9 @@ export function activate(context: vscode.ExtensionContext): void {
     // Initialize decorations based on current configuration
     configuration.initializeDecorationTypes();
     decorationManager.initialize(); // Initialize DecorationManager after types are set
+
+    // Initialize InlineCompletionProvider
+    context.subscriptions.push(new InlineCompletionProvider(context));
 
     // Set initial active editor for ExtensionState
     extensionState.setActiveEditor(vscode.window.activeTextEditor);

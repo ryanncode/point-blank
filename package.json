@@ -31,6 +31,10 @@
       {
         "command": "pointblank.quickOpenFile",
         "title": "Point Blank: Quick Open File from Template"
+      },
+      {
+        "command": "pointblank.expandTemplate",
+        "title": "Point Blank: Expand Template Inline"
       }
     ],
     "keybindings": [
@@ -50,6 +54,12 @@
         "command": "pointblank.handleEnterKey",
         "key": "enter",
         "when": "editorTextFocus && !editorHasSelection"
+      },
+      {
+        "command": "pointblank.quickOpenFile",
+        "key": "alt+n",
+        "mac": "alt+n",
+        "when": "editorTextFocus"
       }
     ],
     "configuration": {

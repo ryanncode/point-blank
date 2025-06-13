@@ -35,7 +35,8 @@ export class DocumentParser {
             flatNodes.push(newNode);
         }
 
-        const tree = DocumentTree.create(document, flatNodes);
+        const rootNodes = this.buildTreeFromFlatList(flatNodes);
+        const tree = DocumentTree.create(document, rootNodes);
         return tree;
     }
 
@@ -104,25 +105,46 @@ export class DocumentParser {
      * Reconstructs the parent/child hierarchy from a flat list of nodes based on indentation and header levels.
      */
     private buildTreeFromFlatList(nodes: BlockNode[]): BlockNode[] {
-        const rootNodes: BlockNode[] = [];
-        const parentStack: BlockNode[] = []; // Stores potential parent nodes
+        interface TempMutableNode {
+            original: BlockNode; // Reference to the original immutable BlockNode
+            parent?: TempMutableNode;
+            children: TempMutableNode[];
+            lineNumber: number;
+            indent: number;
+            trimmedText: string;
+            isExcluded: boolean;
+            isCodeBlockDelimiter: boolean;
+            headerLevel: number;
+        }
 
-        for (const node of nodes) {
-            const nodeHeaderLevel = DocumentParser.getHeaderLevel(node.trimmedText);
+        const mutableNodes: TempMutableNode[] = nodes.map(node => ({
+            original: node,
+            children: [],
+            lineNumber: node.lineNumber,
+            indent: node.indent,
+            trimmedText: node.trimmedText,
+            isExcluded: node.isExcluded,
+            isCodeBlockDelimiter: node.isCodeBlockDelimiter,
+            headerLevel: DocumentParser.getHeaderLevel(node.trimmedText)
+        }));
 
+        const mutableRootNodes: TempMutableNode[] = [];
+        const parentStack: TempMutableNode[] = []; // Stores potential parent mutable nodes
+
+        // Pass 1: Build a Mutable Tree
+        for (const mutableNode of mutableNodes) {
             // Adjust parentStack based on indentation or header level
             while (parentStack.length > 0) {
                 const lastParent = parentStack[parentStack.length - 1];
-                const lastParentHeaderLevel = DocumentParser.getHeaderLevel(lastParent.trimmedText);
 
-                if (nodeHeaderLevel > 0 && lastParentHeaderLevel > 0) {
+                if (mutableNode.headerLevel > 0 && lastParent.headerLevel > 0) {
                     // Both are headers: pop if current node's level is less than or equal to parent's
-                    if (nodeHeaderLevel <= lastParentHeaderLevel) {
+                    if (mutableNode.headerLevel <= lastParent.headerLevel) {
                         parentStack.pop();
                     } else {
                         break; // Current header is a sub-header of the last parent header
                     }
-                } else if (node.indent <= lastParent.indent) {
+                } else if (mutableNode.indent <= lastParent.indent) {
                     // Indentation-based: pop if current node's indent is less than or equal to parent's
                     parentStack.pop();
                 } else {
@@ -130,30 +152,63 @@ export class DocumentParser {
                 }
             }
 
-            const parent = parentStack.length > 0 ? parentStack[parentStack.length - 1] : undefined;
+            const potentialParent = parentStack.length > 0 ? parentStack[parentStack.length - 1] : undefined;
 
-            // Create a new node with the correct parent
-            // Note: BlockNode's children array is readonly, so we need to reconstruct parents
-            // if we were truly aiming for full immutability here. For this context,
-            // we'll assume the direct manipulation of children (via casting) is acceptable
-            // for the purpose of demonstrating the tree building logic.
-            const newNode = new BlockNode(node.line, node.lineNumber, node.isExcluded, parent);
-
-            if (parent) {
-                // This cast is a simplification. In a truly immutable design,
-                // the parent would need to be recreated with the new child.
-                (parent.children as BlockNode[]).push(newNode);
+            if (potentialParent) {
+                mutableNode.parent = potentialParent;
+                potentialParent.children.push(mutableNode);
             } else {
-                rootNodes.push(newNode);
+                mutableRootNodes.push(mutableNode);
             }
 
             // Only push non-excluded nodes onto the stack as potential parents
             // and only if they are not code block delimiters.
-            if (!newNode.isExcluded && !newNode.isCodeBlockDelimiter) {
-                parentStack.push(newNode);
+            if (!mutableNode.isExcluded && !mutableNode.isCodeBlockDelimiter) {
+                parentStack.push(mutableNode);
             }
         }
-        return rootNodes;
+
+        // Pass 2: Convert to an Immutable Tree (bottom-up)
+        const immutableNodeMap = new Map<TempMutableNode, BlockNode>();
+
+        const convertToImmutable = (mutableNode: TempMutableNode): BlockNode => {
+            if (immutableNodeMap.has(mutableNode)) {
+                return immutableNodeMap.get(mutableNode)!;
+            }
+
+            // Recursively convert children first
+            const immutableChildren: BlockNode[] = mutableNode.children.map(child => convertToImmutable(child));
+
+            // Create the immutable BlockNode
+            const immutableBlockNode = new BlockNode(
+                mutableNode.original.line,
+                mutableNode.lineNumber,
+                mutableNode.isExcluded,
+                undefined, // Parent will be set by its own parent's conversion
+                immutableChildren
+            );
+
+            immutableNodeMap.set(mutableNode, immutableBlockNode);
+
+            // Now that the immutable node exists, update its children's parent references
+            // This is crucial for the immutable BlockNode's parent property to be correct
+            const updatedChildrenWithParents: BlockNode[] = immutableChildren.map(child => {
+                if (child.parent !== immutableBlockNode) {
+                    return child.withParent(immutableBlockNode);
+                }
+                return child;
+            });
+
+            // Create a new immutableBlockNode with correctly parented children
+            const finalImmutableBlockNode = immutableBlockNode.withChildren(updatedChildrenWithParents);
+            immutableNodeMap.set(mutableNode, finalImmutableBlockNode); // Update map with the final version
+
+            return finalImmutableBlockNode;
+        };
+
+        const finalImmutableRootNodes: BlockNode[] = mutableRootNodes.map(root => convertToImmutable(root));
+
+        return finalImmutableRootNodes;
     }
 
     /**

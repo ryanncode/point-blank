@@ -23,12 +23,28 @@ export class DocumentTree {
      * Populates the internal map for quick lookup of nodes by line number.
      * This is done recursively for all nodes in the tree.
      */
-    private populateNodesByLine(nodes: readonly BlockNode[]): void {
-        for (const node of nodes) {
-            this._nodesByLine.set(node.lineNumber, node);
-            if (node.children.length > 0) {
-                this.populateNodesByLine(node.children);
+    private populateNodesByLine(rootNodes: readonly BlockNode[]): void {
+        const allNodes: BlockNode[] = [];
+        const stack: BlockNode[] = [...rootNodes];
+
+        while (stack.length > 0) {
+            const node = stack.pop();
+            if (node) {
+                allNodes.push(node);
+                // Add children to the stack to be processed.
+                // Reverse to maintain order if processing from left to right (or top to bottom in a tree).
+                for (let i = node.children.length - 1; i >= 0; i--) {
+                    stack.push(node.children[i]);
+                }
             }
+        }
+
+        // Sort all collected nodes by their line number
+        allNodes.sort((a, b) => a.lineNumber - b.lineNumber);
+
+        // Populate the map with sorted nodes
+        for (const node of allNodes) {
+            this._nodesByLine.set(node.lineNumber, node);
         }
     }
 

@@ -79,22 +79,6 @@ export class DocumentModel {
             return;
         }
 
-        // Handle expandTemplateCommand trigger (if still needed, consider moving this logic)
-        // This logic is specific to a command and might be better handled outside the core parsing loop.
-        // For now, keeping it for functional parity, but it's a candidate for refactoring.
-        if (event.contentChanges.length === 1) {
-            const change = event.contentChanges[0];
-            const line = event.document.lineAt(change.range.start.line);
-            const lineText = line.text;
-
-            const typedNodeTriggerMatch = lineText.match(/^\s*@([a-zA-Z0-9_]+)\s$/);
-
-            if (typedNodeTriggerMatch && change.text === ' ') {
-                const typeName = typedNodeTriggerMatch[1];
-                vscode.commands.executeCommand('pointblank.expandTemplate', typeName, this);
-                return; // Command will trigger another event with new content
-            }
-        }
 
         // Parse the document incrementally (or full parse for now)
         const newDocumentTree = this._parser.parse(this._documentTree, event.contentChanges);
