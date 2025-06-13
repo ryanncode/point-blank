@@ -3,6 +3,7 @@
  */
 export class Timer {
     private label: string;
+    public static enabled: boolean = false; // Global flag to enable/disable timer output
 
     constructor(label: string) {
         this.label = label;
@@ -12,13 +13,17 @@ export class Timer {
      * Starts the timer.
      */
     public start(): void {
-        console.time(this.label);
+        if (Timer.enabled) {
+            console.time(this.label);
+        }
     }
 
     /**
      * Stops the timer and logs the elapsed time.
      */
     public stop(): void {
-        console.timeEnd(this.label);
+        if (Timer.enabled) {
+            console.timeEnd(this.label);
+        }
     }
 }
