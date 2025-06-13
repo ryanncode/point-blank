@@ -3,7 +3,6 @@
 // and orchestrates the registration of providers and event listeners.
 
 import * as vscode from 'vscode';
-import { IndentFoldingRangeProvider } from './providers/indentFoldingProvider';
 import { ExtensionState } from './state/extensionState';
 import { Configuration } from './config/configuration';
 import { focusModeCommand } from './commands/focusMode';
@@ -90,14 +89,6 @@ export function activate(context: vscode.ExtensionContext): void {
         }
     }));
 
-    // Register the IndentFoldingRangeProvider for specified languages.
-    // This enables indentation-based folding in plain text, markdown, and untitled files.
-    context.subscriptions.push(
-        vscode.languages.registerFoldingRangeProvider(
-            ['plaintext', 'markdown', 'untitled'],
-            new IndentFoldingRangeProvider()
-        )
-    );
 
     // Listen for changes in the active text editor.
     // The DecorationManager handles setting its active editor internally.

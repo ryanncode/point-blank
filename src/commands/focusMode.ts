@@ -1,7 +1,5 @@
 import * as vscode from 'vscode';
 import { ExtensionState } from '../state/extensionState';
-import { DocumentModel } from '../document/documentModel';
-import { BlockNode } from '../document/blockNode';
 
 /**
  * Implements the 'pointblank.focusMode' command.
@@ -20,52 +18,69 @@ export async function focusModeCommand(extensionState: ExtensionState): Promise<
     const document = editor.document;
     const currentLine = editor.selection.active.line;
 
-    const documentModel = extensionState.getDocumentModel(document.uri.toString());
-    if (!documentModel) {
-        vscode.window.showInformationMessage('Document model not found for the active editor.');
-        return;
-    }
-
-    const documentTree = documentModel.documentTree;
-    let currentNode: BlockNode | undefined = documentTree.getNodeAtLine(currentLine);
-
-    // If the current line is not a block node, do nothing as per the plan.
-    if (!currentNode) {
-        return;
-    }
-
-    const linesToKeepUnfolded = new Set<number>();
-    let tempNode: BlockNode | undefined = currentNode;
-
-    // Add the current node and all its ancestors to the set of lines to keep unfolded
-    while (tempNode) {
-        linesToKeepUnfolded.add(tempNode.lineNumber);
-        tempNode = tempNode.parent;
-    }
-
     try {
-        const linesToFold: number[] = [];
+        // Ensure a clean, fully unfolded state before applying focus
+        await vscode.commands.executeCommand('editor.unfoldAll');
 
-        // Helper to recursively find all foldable nodes not in the "keep unfolded" path
-        const findLinesToFold = (nodes: readonly BlockNode[]) => {
-            for (const node of nodes) {
-                if (node.children.length > 0) {
-                    // If this node is not in the path to keep unfolded, and it has children, fold it.
-                    // We only fold the parent line, VS Code handles the range.
-                    if (!linesToKeepUnfolded.has(node.lineNumber)) {
-                        linesToFold.push(node.lineNumber);
+        // Get all folding ranges from VS Code's native folding provider
+        const allFoldingRanges = await vscode.commands.executeCommand(
+            'vscode.executeFoldingRangeProvider',
+            document.uri
+        ) as vscode.FoldingRange[];
+
+        if (!allFoldingRanges || allFoldingRanges.length === 0) {
+            return; // No foldable regions found
+        }
+
+        const rangesToKeepUnfolded = new Set<vscode.FoldingRange>();
+        let currentContainingRange: vscode.FoldingRange | undefined;
+
+        // Find the innermost folding range that contains the current line
+        // This is the "current block" the user is focused on.
+        for (const range of allFoldingRanges) {
+            if (currentLine >= range.start && currentLine <= range.end) {
+                // If multiple ranges contain the line, pick the smallest (most specific) one
+                if (!currentContainingRange ||
+                    (range.end - range.start < currentContainingRange.end - currentContainingRange.start)) {
+                    currentContainingRange = range;
+                }
+            }
+        }
+
+        if (currentContainingRange) {
+            rangesToKeepUnfolded.add(currentContainingRange);
+
+            // Find all true parent ranges of the current containing range
+            let tempChildRange: vscode.FoldingRange | undefined = currentContainingRange;
+            while (tempChildRange) {
+                let immediateParent: vscode.FoldingRange | undefined;
+                for (const potentialParent of allFoldingRanges) {
+                    // A potential parent must contain the child range
+                    if (potentialParent.start < tempChildRange.start && potentialParent.end >= tempChildRange.end) {
+                        // Among all containing ranges, find the one that is the "tightest fit"
+                        // i.e., its start line is closest to the child's start, and its end line is closest to the child's end.
+                        if (!immediateParent ||
+                            (potentialParent.start > immediateParent.start ||
+                             (potentialParent.start === immediateParent.start && potentialParent.end < immediateParent.end))) {
+                            immediateParent = potentialParent;
+                        }
                     }
                 }
-                // Recursively check children
-                findLinesToFold(node.children);
+
+                if (immediateParent && !rangesToKeepUnfolded.has(immediateParent)) {
+                    rangesToKeepUnfolded.add(immediateParent);
+                    tempChildRange = immediateParent; // Move up to the parent for the next iteration
+                } else {
+                    tempChildRange = undefined; // No more immediate parents found
+                }
             }
-        };
+        }
 
-        findLinesToFold(documentTree.rootNodes);
-
-        // Execute fold commands for the identified lines
-        if (linesToFold.length > 0) {
-            await vscode.commands.executeCommand('editor.fold', { selectionLines: linesToFold });
+        // Iterate through all folding ranges and fold those not in rangesToKeepUnfolded
+        for (const range of allFoldingRanges) {
+            if (!rangesToKeepUnfolded.has(range)) {
+                await vscode.commands.executeCommand('editor.fold', { selectionLines: [range.start] });
+            }
         }
 
     } catch (error) {

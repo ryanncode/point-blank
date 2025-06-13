@@ -137,18 +137,31 @@ export class DocumentParser {
             while (parentStack.length > 0) {
                 const lastParent = parentStack[parentStack.length - 1];
 
-                if (mutableNode.headerLevel > 0 && lastParent.headerLevel > 0) {
-                    // Both are headers: pop if current node's level is less than or equal to parent's
-                    if (mutableNode.headerLevel <= lastParent.headerLevel) {
+                // Rule 1: If the current node is a header
+                if (mutableNode.headerLevel > 0) {
+                    // If the last parent is also a header, pop if current header level is less than or equal to parent's
+                    if (lastParent.headerLevel > 0) {
+                        if (mutableNode.headerLevel <= lastParent.headerLevel) {
+                            parentStack.pop();
+                        } else {
+                            break; // Current header is a sub-header of the last parent header
+                        }
+                    } else {
+                        // If the last parent is NOT a header, a header cannot be its child. Pop the non-header parent.
+                        parentStack.pop();
+                    }
+                } else {
+                    // Rule 2: If the current node is NOT a header (indentation-based)
+                    // If the last parent is a header, and current node is not, it's a child of the header
+                    if (lastParent.headerLevel > 0) {
+                        break;
+                    }
+                    // Otherwise, it's indentation-based
+                    if (mutableNode.indent <= lastParent.indent) {
                         parentStack.pop();
                     } else {
-                        break; // Current header is a sub-header of the last parent header
+                        break; // Current node is a child by indentation
                     }
-                } else if (mutableNode.indent <= lastParent.indent) {
-                    // Indentation-based: pop if current node's indent is less than or equal to parent's
-                    parentStack.pop();
-                } else {
-                    break; // Current node is a child by indentation
                 }
             }
 
@@ -163,7 +176,7 @@ export class DocumentParser {
 
             // Only push non-excluded nodes onto the stack as potential parents
             // and only if they are not code block delimiters.
-            if (!mutableNode.isExcluded && !mutableNode.isCodeBlockDelimiter) {
+            if ((mutableNode.headerLevel > 0 || !mutableNode.isExcluded) && !mutableNode.isCodeBlockDelimiter) {
                 parentStack.push(mutableNode);
             }
         }
