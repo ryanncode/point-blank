@@ -1,229 +1,207 @@
 import * as vscode from 'vscode';
 import { ExtensionState } from '../state/extensionState';
 import { BlockNode } from '../document/blockNode';
-import { Timer } from '../utils/timer'; // Import Timer utility
+import { findTypedNodeParent } from '../utils/nodeUtils';
 
+/**
+ * Provides the logic for the `pointblank.handleEnterKey` command, overriding the default
+ * Enter key behavior to provide context-aware actions like smart indentation,
+ * navigating between properties of a typed node, and handling folded regions.
+ */
 export class EnterKeyHandler {
-    public static enabled: boolean = true; // Global flag to enable/disable Enter key logic timer output
+    private _extensionState: ExtensionState;
 
-    public static async handleEnterKeyCommand() {
+    constructor(extensionState: ExtensionState) {
+        this._extensionState = extensionState;
+    }
+
+    /**
+     * Main command handler for the Enter key. It orchestrates various checks to determine
+     * the correct action based on the cursor's position and the document's structure.
+     */
+    public async handleEnterKeyCommand(): Promise<void> {
         const editor = vscode.window.activeTextEditor;
-        if (!editor) {
-            return;
-        }
-
-        const enterKeyTimer = new Timer('Enter Key Logic');
-        if (EnterKeyHandler.enabled) {
-            enterKeyTimer.start();
-        }
+        if (!editor) return;
 
         const document = editor.document;
         const position = editor.selection.active;
-        const extensionState = ExtensionState.getInstance();
-        const documentModel = extensionState.getDocumentModel(document.uri.toString());
+        const documentModel = this._extensionState.getDocumentModel(document.uri.toString());
 
         if (!documentModel) {
-            // If no document model, execute default Enter key action
             await vscode.commands.executeCommand('type', { text: '\n' });
-            if (EnterKeyHandler.enabled) {
-                enterKeyTimer.stop();
-            }
             return;
         }
 
         const currentBlockNode = documentModel.documentTree.getNodeAtLine(position.line);
 
-        if (currentBlockNode) {
-            const typedNodeTimer = new Timer('Enter Key - Typed Node Logic');
-            if (EnterKeyHandler.enabled) {
-                typedNodeTimer.start();
-            }
+        // --- Context-Specific Enter Key Logic ---
 
-            let typedNodeParent: BlockNode | undefined = undefined;
-            if (currentBlockNode.isTypedNode) {
-                typedNodeParent = currentBlockNode;
-            } else {
-                // Check if current node is a child of a typed node
-                let parent = currentBlockNode.parent;
-                while (parent) {
-                    if (parent.isTypedNode) {
-                        typedNodeParent = parent;
-                        break;
-                    }
-                    parent = parent.parent;
-                }
-            }
-
-            if (typedNodeParent) {
-                const typedNodeChildren = typedNodeParent.children;
-                const typedNodeTitleLine = typedNodeParent.lineNumber;
-                const typedNodeIndent = document.lineAt(typedNodeTitleLine).firstNonWhitespaceCharacterIndex;
-
-                // Case 1: Cursor is on the typed node title line
-                if (currentBlockNode.lineNumber === typedNodeTitleLine) {
-                    if (typedNodeChildren.length > 0) {
-                        // Move to the first child (property)
-                        const firstChildNode = typedNodeChildren[0];
-                        const firstChildLineNumber = firstChildNode.lineNumber;
-                        let newPositionCharacter = firstChildNode.indent;
-                        if (firstChildNode.isKeyValue && firstChildNode.keyValue) {
-                            newPositionCharacter = firstChildNode.keyValue.keyRange.end.character + 2; // After ":: "
-                        }
-                        editor.selection = new vscode.Selection(firstChildLineNumber, newPositionCharacter, firstChildLineNumber, newPositionCharacter);
-                        if (EnterKeyHandler.enabled) {
-                            typedNodeTimer.stop();
-                            enterKeyTimer.stop();
-                        }
-                        return;
-                    } else {
-                        // Insert a new line with increased indentation for the first property
-                        const newIndent = typedNodeIndent + 2; // Assuming 2 spaces for properties
-                        const insertPosition = new vscode.Position(typedNodeTitleLine + 1, 0);
-                        await editor.edit(editBuilder => {
-                            editBuilder.insert(insertPosition, ' '.repeat(newIndent) + '\n');
-                        });
-                        const newPosition = new vscode.Position(typedNodeTitleLine + 1, newIndent);
-                        editor.selection = new vscode.Selection(newPosition, newPosition);
-                        if (EnterKeyHandler.enabled) {
-                            typedNodeTimer.stop();
-                            enterKeyTimer.stop();
-                        }
-                        return;
-                    }
-                }
-
-                // Case 2: Cursor is on a property line of the typed node
-                const currentChildIndex = typedNodeChildren.findIndex(child => child.lineNumber === currentBlockNode.lineNumber);
-                if (currentChildIndex !== -1) {
-                    if (currentChildIndex < typedNodeChildren.length - 1) {
-                        // Move to the next property
-                        const nextChildNode = typedNodeChildren[currentChildIndex + 1];
-                        const nextChildLineNumber = nextChildNode.lineNumber;
-                        let newPositionCharacter = nextChildNode.indent;
-                        if (nextChildNode.isKeyValue && nextChildNode.keyValue) {
-                            newPositionCharacter = nextChildNode.keyValue.keyRange.end.character + 2; // After ":: "
-                        }
-                        editor.selection = new vscode.Selection(nextChildLineNumber, newPositionCharacter, nextChildLineNumber, newPositionCharacter);
-                        if (EnterKeyHandler.enabled) {
-                            typedNodeTimer.stop();
-                            enterKeyTimer.stop();
-                        }
-                        return;
-                    } else {
-                        // It's the last property, insert a new line after the typed node block
-                        // with the indentation of the typed node title line.
-                        const insertLine = typedNodeParent.lineNumber + typedNodeParent.children.length + 1;
-                        const insertPosition = new vscode.Position(insertLine, 0);
-                        await editor.edit(editBuilder => {
-                            editBuilder.insert(insertPosition, ' '.repeat(typedNodeIndent) + '\n');
-                        });
-                        const newPosition = new vscode.Position(insertLine, typedNodeIndent);
-                        editor.selection = new vscode.Selection(newPosition, newPosition);
-                        if (EnterKeyHandler.enabled) {
-                            typedNodeTimer.stop();
-                            enterKeyTimer.stop();
-                        }
-                        return;
-                    }
-                }
-            }
-            if (EnterKeyHandler.enabled) {
-                typedNodeTimer.stop();
-            }
+        // 1. Typed Node Navigation: If inside a typed node (e.g., `(Book)`), navigate between properties.
+        if (currentBlockNode && await this.handleTypedNodeNavigation(editor, currentBlockNode)) {
+            return;
         }
 
-        const foldingLogicTimer = new Timer('Enter Key - Folding Logic');
-        if (EnterKeyHandler.enabled) {
-            foldingLogicTimer.start();
+        // 2. Folded Block Handling: If on the title line of a folded block, create a new line after the block.
+        if (currentBlockNode && currentBlockNode.children.length > 0 && await this.handleFoldedBlock(editor, currentBlockNode)) {
+            return;
         }
 
-        // Integrate DocumentTree based folding logic
-        if (currentBlockNode && currentBlockNode.children.length > 0) {
-            const blockRange = EnterKeyHandler.findBlockRangeInTree(currentBlockNode);
-            const isFolded = editor.visibleRanges.every(range => {
-                return range.start.line > blockRange.end || range.end.line < blockRange.start + 1;
-            });
-
-            if (isFolded && position.line === blockRange.start) {
-                const titleLine = document.lineAt(blockRange.start);
-                const indentation = titleLine.text.substring(0, titleLine.firstNonWhitespaceCharacterIndex);
-
-                const insertPosition = new vscode.Position(blockRange.end + 1, 0);
-                await editor.edit(editBuilder => {
-                    editBuilder.insert(insertPosition, indentation + '\n');
-                });
-
-                const newPosition = new vscode.Position(blockRange.end + 1, indentation.length);
-                editor.selection = new vscode.Selection(newPosition, newPosition);
-                if (EnterKeyHandler.enabled) {
-                    foldingLogicTimer.stop();
-                    enterKeyTimer.stop();
-                }
-                return;
-            }
-        }
- 
-        const line = document.lineAt(position.line);
- 
-        // New logic to handle Enter key after a bullet point
+        // 3. Bullet Point Handling: If the cursor is immediately after a bullet, create a new line above.
         if (currentBlockNode && currentBlockNode.bulletRange && position.character === currentBlockNode.bulletRange.end.character) {
             await editor.edit(editBuilder => {
                 editBuilder.insert(new vscode.Position(position.line, 0), '\n');
             });
- 
-            if (EnterKeyHandler.enabled) {
-                foldingLogicTimer.stop();
-                enterKeyTimer.stop();
-            }
             return;
         }
- 
-        // If not on a folded block's title line or block is not folded, execute default Enter key action
+
+        // 4. Default Behavior with Smart Splitting: If none of the above, split the line,
+        // creating a new bullet point for the text that was after the cursor.
+        const line = document.lineAt(position.line);
         const textAfterCursor = line.text.substring(position.character);
 
         if (textAfterCursor.length > 0) {
-            await EnterKeyHandler.insertBulletPointAndMoveText(editor, position, document);
+            await this.insertBulletPointAndMoveText(editor, position, document);
         } else {
+            // If at the end of the line, just insert a newline.
             await vscode.commands.executeCommand('type', { text: '\n' });
-        }
-
-        if (EnterKeyHandler.enabled) {
-            foldingLogicTimer.stop();
-            enterKeyTimer.stop();
         }
     }
 
-    private static async insertBulletPointAndMoveText(editor: vscode.TextEditor, position: vscode.Position, document: vscode.TextDocument): Promise<void> {
+    /**
+     * Handles Enter key logic when the cursor is within a typed node block.
+     * It navigates to the next property or exits the block.
+     * @returns `true` if the key press was handled, `false` otherwise.
+     */
+    private async handleTypedNodeNavigation(editor: vscode.TextEditor, currentBlockNode: BlockNode): Promise<boolean> {
+        const typedNodeParent = findTypedNodeParent(currentBlockNode);
+        if (!typedNodeParent) return false;
+
+        const { document } = editor;
+        const typedNodeChildren = typedNodeParent.children;
+        const typedNodeTitleLine = typedNodeParent.lineNumber;
+
+        // Case 1: Cursor is on the typed node's title line.
+        if (currentBlockNode.lineNumber === typedNodeTitleLine) {
+            if (typedNodeChildren.length > 0) {
+                // Move to the value of the first property.
+                this.moveCursorToNodeValue(editor, typedNodeChildren[0]);
+            } else {
+                // Create a new property line.
+                const newIndent = document.lineAt(typedNodeTitleLine).firstNonWhitespaceCharacterIndex + 2;
+                await this.insertNewLineAndPositionCursor(editor, typedNodeTitleLine + 1, newIndent);
+            }
+            return true;
+        }
+
+        // Case 2: Cursor is on a property line of the typed node.
+        const currentChildIndex = typedNodeChildren.findIndex((child: BlockNode) => child.lineNumber === currentBlockNode.lineNumber);
+        if (currentChildIndex !== -1) {
+            // Check if the cursor is at the end of the line (or if the line is empty after the key part)
+            const line = document.lineAt(currentBlockNode.lineNumber);
+            const isAtEndOfLine = editor.selection.active.character === line.text.length;
+
+            if (isAtEndOfLine) {
+                if (currentChildIndex < typedNodeChildren.length - 1) {
+                    // Move to the value of the next property.
+                    this.moveCursorToNodeValue(editor, typedNodeChildren[currentChildIndex + 1]);
+                } else {
+                    // Last property: create a new line after the entire block.
+                    const indent = document.lineAt(typedNodeTitleLine).firstNonWhitespaceCharacterIndex;
+                    const insertLineNum = this.findBlockRangeInTree(typedNodeParent).end + 1;
+                    await this.insertNewLineAndPositionCursor(editor, insertLineNum, indent);
+                }
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Handles Enter key logic when on the title line of a folded block.
+     * @returns `true` if the key press was handled, `false` otherwise.
+     */
+    private async handleFoldedBlock(editor: vscode.TextEditor, currentBlockNode: BlockNode): Promise<boolean> {
+        const blockRange = this.findBlockRangeInTree(currentBlockNode);
+        const isFolded = editor.visibleRanges.every(range =>
+            range.start.line > blockRange.end || range.end.line < blockRange.start + 1
+        );
+
+        if (isFolded && editor.selection.active.line === blockRange.start) {
+            const titleLine = editor.document.lineAt(blockRange.start);
+            const indentation = titleLine.text.substring(0, titleLine.firstNonWhitespaceCharacterIndex);
+            const insertPosition = new vscode.Position(blockRange.end + 1, 0);
+
+            await editor.edit(editBuilder => {
+                editBuilder.insert(insertPosition, indentation + '\n');
+            });
+
+            const newPosition = new vscode.Position(blockRange.end + 1, indentation.length);
+            editor.selection = new vscode.Selection(newPosition, newPosition);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Splits the current line at the cursor, creating a new line with a bullet point
+     * and moving the text that was after the cursor to the new line.
+     */
+    private async insertBulletPointAndMoveText(editor: vscode.TextEditor, position: vscode.Position, document: vscode.TextDocument): Promise<void> {
         const line = document.lineAt(position.line);
         const textAfterCursor = line.text.substring(position.character);
         const indentation = line.text.substring(0, line.firstNonWhitespaceCharacterIndex);
 
         await editor.edit(editBuilder => {
-            // Delete text after cursor on current line
-            const rangeToDelete = new vscode.Range(position, line.range.end);
-            editBuilder.delete(rangeToDelete);
-            
-            // Insert a new line with a bullet point, indentation, and the text from after the cursor
-            const textToInsert = `\n${indentation}• ${textAfterCursor}`;
-            editBuilder.insert(position, textToInsert);
+            // Delete text after the cursor on the current line.
+            editBuilder.delete(new vscode.Range(position, line.range.end));
+            // Insert a new line with indentation, a bullet, and the moved text.
+            editBuilder.insert(position, `\n${indentation}• ${textAfterCursor}`);
         });
 
-        // Set new cursor position
+        // Position the cursor after the new bullet point.
         const newPosition = new vscode.Position(position.line + 1, indentation.length + 2); // After '• '
         editor.selection = new vscode.Selection(newPosition, newPosition);
     }
 
-    private static findBlockRangeInTree(blockNode: BlockNode): { start: number, end: number } {
-        let maxLine = blockNode.lineNumber;
 
-        function traverseChildren(node: BlockNode) {
+    /**
+     * Moves the cursor to the beginning of the value part of a key-value node,
+     * or to the start of the content for other nodes.
+     */
+    private moveCursorToNodeValue(editor: vscode.TextEditor, node: BlockNode): void {
+        const line = node.lineNumber;
+        let char = node.indent;
+        if (node.isKeyValue && node.keyValue) {
+            char = node.keyValue.keyRange.end.character + 2; // After ":: "
+        }
+        const newPosition = new vscode.Position(line, char);
+        editor.selection = new vscode.Selection(newPosition, newPosition);
+    }
+
+    /**
+     * Inserts a new line with specified indentation and positions the cursor.
+     */
+    private async insertNewLineAndPositionCursor(editor: vscode.TextEditor, lineNumber: number, indentation: number): Promise<void> {
+        await editor.edit(editBuilder => {
+            editBuilder.insert(new vscode.Position(lineNumber, 0), ' '.repeat(indentation) + '\n');
+        });
+        const newPosition = new vscode.Position(lineNumber, indentation);
+        editor.selection = new vscode.Selection(newPosition, newPosition);
+    }
+
+    /**
+     * Calculates the full line range of a block, including all its children.
+     */
+    private findBlockRangeInTree(blockNode: BlockNode): { start: number, end: number } {
+        let maxLine = blockNode.lineNumber;
+        const traverse = (node: BlockNode) => {
             for (const child of node.children) {
                 maxLine = Math.max(maxLine, child.lineNumber);
-                traverseChildren(child);
+                traverse(child);
             }
-        }
-
-        traverseChildren(blockNode);
+        };
+        traverse(blockNode);
         return { start: blockNode.lineNumber, end: maxLine };
     }
 }

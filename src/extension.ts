@@ -1,8 +1,11 @@
-// This is the main entry point for the Point Blank VS Code extension.
-// It handles the activation and deactivation lifecycle of the extension,
-// and orchestrates the registration of providers and event listeners.
+/**
+ * This file is the main entry point for the Point Blank VS Code extension.
+ * It handles the activation and deactivation lifecycle of the extension,
+ * orchestrating the registration of commands, providers, and event listeners.
+ */
 
 import * as vscode from 'vscode';
+import { findTypedNodeParent } from './utils/nodeUtils';
 import { ExtensionState } from './state/extensionState';
 import { Configuration } from './config/configuration';
 import { focusModeCommand } from './commands/focusMode';
@@ -18,86 +21,86 @@ import { InlineCompletionProvider } from './providers/inlineCompletionProvider';
 
 /**
  * Activates the Point Blank extension.
- * This function is called when the extension is activated, which is determined by the
- * `activationEvents` in `package.json`.
+ * This function is called by VS Code when the extension is activated, as defined
+ * by the `activationEvents` in `package.json`. It sets up the core components,
+ * registers commands, and initializes event listeners.
  *
- * It initializes the decoration manager and folding range provider, and registers
- * necessary event listeners to update decorations and folding ranges
- * when the active editor changes or the document content is modified.
- *
- * @param context The extension context provided by VS Code.
+ * @param context The extension context provided by VS Code, used for managing disposables.
  */
 export function activate(context: vscode.ExtensionContext): void {
+    // --- Singleton Initializations ---
     const extensionState = ExtensionState.getInstance();
     const configuration = Configuration.getInstance();
-    const templateService = TemplateService.getInstance();
-    const decorationManager = new DecorationManager();
-    const commandManager = new CommandManager(extensionState); // Instantiate CommandManager
+    TemplateService.getInstance(); // Ensures it's initialized and watching for config changes.
 
-    // Initialize decorations based on current configuration
-    configuration.initializeDecorationTypes();
-    decorationManager.initialize(); // Initialize DecorationManager after types are set
+    // --- Component Initializations ---
+    const decorationManager = new DecorationManager(extensionState);
+    const commandManager = new CommandManager(extensionState);
 
-    // Register CommandManager listeners and overrides
+    // Initialize decoration types from configuration and prepare the manager.
+    decorationManager.initialize();
+
+    // Register command overrides (e.g., 'type', 'deleteLeft') and listeners.
     commandManager.register(context);
 
-    // Initialize InlineCompletionProvider
-    context.subscriptions.push(new InlineCompletionProvider(context));
+    // Register the inline completion provider for '@' sign triggers.
+    context.subscriptions.push(new InlineCompletionProvider());
 
-    // Set initial active editor for ExtensionState
+    // Set the initial active editor in the extension's state.
     extensionState.setActiveEditor(vscode.window.activeTextEditor);
 
-    // Register Focus Mode (Hoisting) command
-    context.subscriptions.push(vscode.commands.registerCommand('pointblank.focusMode', () => focusModeCommand(extensionState)));
+    // --- Command Registrations ---
+    context.subscriptions.push(
+        vscode.commands.registerCommand('pointblank.focusMode', () => focusModeCommand(extensionState)),
+        vscode.commands.registerCommand('pointblank.unfocusMode', unfocusModeCommand),
+        vscode.commands.registerCommand('pointblank.handleEnterKey', () => new EnterKeyHandler(extensionState).handleEnterKeyCommand()),
+        vscode.commands.registerCommand('pointblank.expandTemplate', expandTemplateCommand),
+        vscode.commands.registerCommand('pointblank.quickOpenFile', quickOpenFileCommand)
+    );
 
-    // Register Unfocus command
-    context.subscriptions.push(vscode.commands.registerCommand('pointblank.unfocusMode', unfocusModeCommand));
-
-    // Register custom Enter key command
-    context.subscriptions.push(vscode.commands.registerCommand('pointblank.handleEnterKey', EnterKeyHandler.handleEnterKeyCommand));
-
-    // Register the new template expansion command
-    context.subscriptions.push(vscode.commands.registerCommand('pointblank.expandTemplate', expandTemplateCommand));
-
-    // Register the new quick open file from template command
-    context.subscriptions.push(vscode.commands.registerCommand('pointblank.quickOpenFile', quickOpenFileCommand));
-
-    // Initialize DocumentModel for all currently open text documents
+    // --- Document Model Management ---
+    // Initialize a DocumentModel for each currently open text document.
     vscode.workspace.textDocuments.forEach(document => {
         if (document.uri.scheme === 'file' || document.uri.scheme === 'untitled') {
             const model = new DocumentModel(document);
             extensionState.addDocumentModel(document.uri.toString(), model);
-            model.setDecorationManager(decorationManager); // Link DocumentModel to DecorationManager
+            model.setDecorationManager(decorationManager);
+            decorationManager.updateDecorations(model.documentTree);
         }
     });
 
-    // Listen for new text documents being opened
+    // Listen for new documents being opened and create a DocumentModel for them.
     context.subscriptions.push(vscode.workspace.onDidOpenTextDocument(document => {
         if (document.uri.scheme === 'file' || document.uri.scheme === 'untitled') {
             const model = new DocumentModel(document);
             extensionState.addDocumentModel(document.uri.toString(), model);
-            model.setDecorationManager(decorationManager); // Link DocumentModel to DecorationManager
+            model.setDecorationManager(decorationManager);
+            decorationManager.updateDecorations(model.documentTree);
         }
     }));
 
-    // Listen for configuration changes to re-initialize decorations
-    context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(async event => {
+    // Listen for document close events to clean up and dispose of DocumentModel instances.
+    context.subscriptions.push(vscode.workspace.onDidCloseTextDocument(document => {
+        extensionState.removeDocumentModel(document.uri.toString());
+    }));
+
+    // --- Event Listeners ---
+    // Listen for configuration changes to re-initialize decoration styles.
+    context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(event => {
         if (event.affectsConfiguration('pointblank')) {
-            configuration.initializeDecorationTypes();
-            // Re-trigger decoration updates via the DecorationManager
+            decorationManager.reloadDecorationTypes(); // Reload decoration types in manager
+            // Re-trigger decoration updates for the active editor.
             if (vscode.window.activeTextEditor) {
                 const documentModel = extensionState.getDocumentModel(vscode.window.activeTextEditor.document.uri.toString());
                 if (documentModel) {
-                    decorationManager.updateDecorations(documentModel.documentTree);
+                    documentModel.triggerUpdateDecorations();
                 }
             }
         }
     }));
 
-
-    // Listen for changes in the active text editor.
-    // The DecorationManager handles setting its active editor internally.
-    vscode.window.onDidChangeActiveTextEditor(editor => {
+    // Listen for changes in the active text editor to update decorations.
+    context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(editor => {
         extensionState.setActiveEditor(editor);
         if (editor) {
             const documentModel = extensionState.getDocumentModel(editor.document.uri.toString());
@@ -105,26 +108,29 @@ export function activate(context: vscode.ExtensionContext): void {
                 documentModel.triggerUpdateDecorations();
             }
         }
-    }, null, context.subscriptions);
+    }));
 
-    // Listen for selection changes to update the 'pointblank.lineHasBullet' context
+    // Listen for selection changes to update the 'pointblank.lineHasBullet' context key.
+    // This is used for conditional UI, like the "outdent" command visibility.
     context.subscriptions.push(vscode.window.onDidChangeTextEditorSelection(event => {
         const editor = event.textEditor;
-        if (!editor) {
-            return;
-        }
+        if (!editor) return;
 
         const documentModel = extensionState.getDocumentModel(editor.document.uri.toString());
-        if (!documentModel) {
-            return;
-        }
+        if (!documentModel) return;
 
         const selection = editor.selection;
         let lineHasBullet = false;
+        const line = editor.document.lineAt(selection.active.line);
+        const blockNode = documentModel.documentTree.getNodeAtLine(line.lineNumber);
+        if (blockNode) {
+            const typedNodeParent = findTypedNodeParent(blockNode);
+            vscode.commands.executeCommand('setContext', 'pointblank.isInTypedNode', !!typedNodeParent);
+        } else {
+            vscode.commands.executeCommand('setContext', 'pointblank.isInTypedNode', false);
+        }
 
         if (selection.isSingleLine) {
-            const line = editor.document.lineAt(selection.active.line);
-            const blockNode = documentModel.documentTree.getNodeAtLine(line.lineNumber);
             if (blockNode && blockNode.bulletRange) {
                 lineHasBullet = true;
             }
@@ -132,22 +138,18 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.executeCommand('setContext', 'pointblank.lineHasBullet', lineHasBullet);
     }));
 
-    // Listen for document close events to dispose of DocumentModel instances
-    context.subscriptions.push(vscode.workspace.onDidCloseTextDocument(document => {
-        extensionState.removeDocumentModel(document.uri.toString());
-    }));
-
-    // Add DecorationManager to disposables
+    // --- Resource Management ---
+    // Ensure the DecorationManager is disposed when the extension is deactivated.
     context.subscriptions.push(decorationManager as vscode.Disposable);
 }
 
 /**
  * Deactivates the Point Blank extension.
- * This function is called when the extension is deactivated.
- * It disposes of all active decoration types and DocumentModel instances to prevent memory leaks.
+ * This function is called by VS Code when the extension is deactivated. It's responsible
+ * for cleaning up resources, such as disposing of decoration types and document models,
+ * to prevent memory leaks.
  */
 export function deactivate(): void {
-    ExtensionState.getInstance().disposeDecorationTypes();
-    // The DecorationManager is disposed via context.subscriptions
+    // The DecorationManager is automatically disposed via context.subscriptions.
 }
 

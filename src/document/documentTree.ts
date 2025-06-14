@@ -2,102 +2,83 @@ import * as vscode from 'vscode';
 import { BlockNode } from './blockNode';
 
 /**
- * Represents the immutable tree structure of a document, composed of BlockNodes.
- * This class acts as the single source of truth for the document's parsed state.
+ * An immutable representation of the document's hierarchical structure, composed of `BlockNode`s.
+ * It provides efficient methods for accessing nodes, which is crucial for features like
+ * decoration rendering and command logic.
  */
 export class DocumentTree {
     public readonly rootNodes: readonly BlockNode[];
     public readonly document: vscode.TextDocument;
 
-    // A flat map for quick lookup of nodes by line number
+    // A map for O(1) lookup of nodes by their line number.
     private readonly _nodesByLine: Map<number, BlockNode>;
+    // A sorted array of all nodes for efficient range-based lookups.
+    private readonly _allNodesSorted: readonly BlockNode[];
 
-    constructor(document: vscode.TextDocument, rootNodes: BlockNode[]) {
+    private constructor(document: vscode.TextDocument, rootNodes: BlockNode[]) {
         this.document = document;
         this.rootNodes = rootNodes;
         this._nodesByLine = new Map<number, BlockNode>();
-        this.populateNodesByLine(rootNodes);
-    }
 
-    /**
-     * Populates the internal map for quick lookup of nodes by line number.
-     * This is done recursively for all nodes in the tree.
-     */
-    private populateNodesByLine(rootNodes: readonly BlockNode[]): void {
+        // Populate the lookup map and the sorted array in a single traversal.
         const allNodes: BlockNode[] = [];
-        const stack: BlockNode[] = [...rootNodes];
+        const stack: BlockNode[] = [...rootNodes].reverse(); // Use reverse for depth-first traversal order.
 
         while (stack.length > 0) {
-            const node = stack.pop();
-            if (node) {
-                allNodes.push(node);
-                // Add children to the stack to be processed.
-                // Reverse to maintain order if processing from left to right (or top to bottom in a tree).
-                for (let i = node.children.length - 1; i >= 0; i--) {
-                    stack.push(node.children[i]);
-                }
+            const node = stack.pop()!;
+            allNodes.push(node);
+            this._nodesByLine.set(node.lineNumber, node);
+            // Add children to the stack in reverse order to maintain correct traversal.
+            for (let i = node.children.length - 1; i >= 0; i--) {
+                stack.push(node.children[i]);
             }
         }
-
-        // Sort all collected nodes by their line number
-        allNodes.sort((a, b) => a.lineNumber - b.lineNumber);
-
-        // Populate the map with sorted nodes
-        for (const node of allNodes) {
-            this._nodesByLine.set(node.lineNumber, node);
-        }
+        this._allNodesSorted = allNodes;
     }
 
     /**
-     * Retrieves a BlockNode by its line number.
+     * Retrieves a `BlockNode` by its line number using a direct map lookup.
      * @param lineNumber The line number of the desired node.
-     * @returns The BlockNode at the specified line number, or undefined if not found.
+     * @returns The `BlockNode` at the specified line, or `undefined` if not found.
      */
     public getNodeAtLine(lineNumber: number): BlockNode | undefined {
         return this._nodesByLine.get(lineNumber);
     }
 
     /**
-     * Returns all BlockNodes in a flat array, ordered by line number.
-     * This is useful for operations that need to iterate over all lines,
-     * such as decoration calculation for the entire document.
+     * Returns a flat array of all `BlockNode`s in the tree, ordered by line number.
      */
-    public getAllNodesFlat(): BlockNode[] {
-        const allNodes: BlockNode[] = [];
-        // Iterate through the map which maintains insertion order (by line number)
-        for (const node of this._nodesByLine.values()) {
-            allNodes.push(node);
-        }
-        return allNodes;
+    public getAllNodesFlat(): readonly BlockNode[] {
+        return this._allNodesSorted;
     }
 
     /**
-     * Returns all BlockNodes within a specified line number range, ordered by line number.
-     * This is useful for operations that need to process only a visible portion of the document.
+     * Efficiently returns all `BlockNode`s within a specified line number range.
+     * This is optimized for viewport-aware features.
      * @param startLine The starting line number (inclusive).
      * @param endLine The ending line number (inclusive).
-     * @returns An array of BlockNodes within the specified range.
+     * @returns An array of `BlockNode`s within the specified range.
      */
     public getNodesInLineRange(startLine: number, endLine: number): BlockNode[] {
+        // This could be further optimized with a binary search if performance becomes an issue.
         const nodesInRange: BlockNode[] = [];
-        let collecting = false;
-
-        for (const node of this._nodesByLine.values()) {
+        for (const node of this._allNodesSorted) {
             if (node.lineNumber >= startLine && node.lineNumber <= endLine) {
                 nodesInRange.push(node);
-                collecting = true;
-            } else if (collecting) {
-                // If we were collecting and now the line number is outside the range, we can stop
-                break;
             }
-            // If not yet collecting and node.lineNumber < startLine, continue iterating
+            if (node.lineNumber > endLine) {
+                break; // Stop iterating once we've passed the desired range.
+            }
         }
         return nodesInRange;
     }
 
     /**
-     * Creates a new DocumentTree instance with updated root nodes.
-     * This is used by the incremental parser to return a new immutable tree.
+     * A static factory method to create a new `DocumentTree` instance.
+     * This is used by the `DocumentParser` to construct a new tree after parsing.
+     * @param document The `vscode.TextDocument` the tree represents.
+     * @param rootNodes The array of root-level `BlockNode`s.
+     * @returns A new `DocumentTree` instance.
      */
     public static create(document: vscode.TextDocument, rootNodes: BlockNode[]): DocumentTree {
         return new DocumentTree(document, rootNodes);

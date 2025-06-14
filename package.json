@@ -57,7 +57,7 @@
       {
         "command": "pointblank.handleEnterKey",
         "key": "enter",
-        "when": "editorTextFocus && !editorHasSelection"
+        "when": "editorTextFocus && !editorHasSelection && (pointblank.lineHasBullet || pointblank.isInTypedNode)"
       },
       {
         "command": "pointblank.quickOpenFile",

@@ -3,15 +3,15 @@ import { ExtensionState } from '../state/extensionState';
 
 /**
  * Implements the 'pointblank.focusMode' command.
- * This command folds all code blocks except for the one containing the cursor,
+ * This command folds all code blocks except for the one containing the cursor and its parent blocks,
  * effectively "hoisting" the current block into focus.
  *
- * @param extensionState The singleton instance of ExtensionState.
+ * @param extensionState The singleton instance of ExtensionState, providing access to the active editor.
  */
 export async function focusModeCommand(extensionState: ExtensionState): Promise<void> {
     const editor = extensionState.activeEditor;
     if (!editor) {
-        vscode.window.showInformationMessage('No active editor found.');
+        vscode.window.showInformationMessage('Point Blank: No active editor found.');
         return;
     }
 
@@ -19,49 +19,43 @@ export async function focusModeCommand(extensionState: ExtensionState): Promise<
     const currentLine = editor.selection.active.line;
 
     try {
-        // Ensure a clean, fully unfolded state before applying focus
+        // 1. Start with a clean slate by unfolding everything.
         await vscode.commands.executeCommand('editor.unfoldAll');
 
-        // Get all folding ranges from VS Code's native folding provider
-        const allFoldingRanges = await vscode.commands.executeCommand(
+        // 2. Get all possible folding ranges from the active document.
+        const allFoldingRanges = await vscode.commands.executeCommand<vscode.FoldingRange[]>(
             'vscode.executeFoldingRangeProvider',
             document.uri
-        ) as vscode.FoldingRange[];
+        );
 
         if (!allFoldingRanges || allFoldingRanges.length === 0) {
-            return; // No foldable regions found
+            return; // No foldable regions found.
         }
 
+        // 3. Identify the hierarchy of ranges to keep unfolded.
         const rangesToKeepUnfolded = new Set<vscode.FoldingRange>();
-        let currentContainingRange: vscode.FoldingRange | undefined;
+        let currentBlockRange: vscode.FoldingRange | undefined;
 
-        // Find the innermost folding range that contains the current line
-        // This is the "current block" the user is focused on.
+        // Find the innermost folding range that contains the cursor.
         for (const range of allFoldingRanges) {
             if (currentLine >= range.start && currentLine <= range.end) {
-                // If multiple ranges contain the line, pick the smallest (most specific) one
-                if (!currentContainingRange ||
-                    (range.end - range.start < currentContainingRange.end - currentContainingRange.start)) {
-                    currentContainingRange = range;
+                if (!currentBlockRange || (range.end - range.start < currentBlockRange.end - currentBlockRange.start)) {
+                    currentBlockRange = range;
                 }
             }
         }
 
-        if (currentContainingRange) {
-            rangesToKeepUnfolded.add(currentContainingRange);
+        // If a containing range is found, trace its parentage up to the root.
+        if (currentBlockRange) {
+            rangesToKeepUnfolded.add(currentBlockRange);
 
-            // Find all true parent ranges of the current containing range
-            let tempChildRange: vscode.FoldingRange | undefined = currentContainingRange;
-            while (tempChildRange) {
+            let childRange: vscode.FoldingRange | undefined = currentBlockRange;
+            while (childRange) {
                 let immediateParent: vscode.FoldingRange | undefined;
+                // Find the tightest fitting parent range.
                 for (const potentialParent of allFoldingRanges) {
-                    // A potential parent must contain the child range
-                    if (potentialParent.start < tempChildRange.start && potentialParent.end >= tempChildRange.end) {
-                        // Among all containing ranges, find the one that is the "tightest fit"
-                        // i.e., its start line is closest to the child's start, and its end line is closest to the child's end.
-                        if (!immediateParent ||
-                            (potentialParent.start > immediateParent.start ||
-                             (potentialParent.start === immediateParent.start && potentialParent.end < immediateParent.end))) {
+                    if (potentialParent.start < childRange.start && potentialParent.end >= childRange.end) {
+                        if (!immediateParent || (potentialParent.start > immediateParent.start || (potentialParent.start === immediateParent.start && potentialParent.end < immediateParent.end))) {
                             immediateParent = potentialParent;
                         }
                     }
@@ -69,14 +63,14 @@ export async function focusModeCommand(extensionState: ExtensionState): Promise<
 
                 if (immediateParent && !rangesToKeepUnfolded.has(immediateParent)) {
                     rangesToKeepUnfolded.add(immediateParent);
-                    tempChildRange = immediateParent; // Move up to the parent for the next iteration
+                    childRange = immediateParent; // Move up the hierarchy.
                 } else {
-                    tempChildRange = undefined; // No more immediate parents found
+                    childRange = undefined; // No more parents found.
                 }
             }
         }
 
-        // Iterate through all folding ranges and fold those not in rangesToKeepUnfolded
+        // 4. Fold all ranges that are not part of the focused hierarchy.
         for (const range of allFoldingRanges) {
             if (!rangesToKeepUnfolded.has(range)) {
                 await vscode.commands.executeCommand('editor.fold', { selectionLines: [range.start] });
@@ -84,6 +78,6 @@ export async function focusModeCommand(extensionState: ExtensionState): Promise<
         }
 
     } catch (error) {
-        vscode.window.showErrorMessage(`Error in Focus Mode: ${error instanceof Error ? error.message : String(error)}`);
+        vscode.window.showErrorMessage(`Point Blank: Error in Focus Mode: ${error instanceof Error ? error.message : String(error)}`);
     }
 }

@@ -1,24 +1,17 @@
 import * as vscode from 'vscode';
-import { ExtensionState } from '../state/extensionState';
 
 /**
  * Manages the configuration settings for the Point Blank extension.
- * This class provides methods to retrieve configuration values and to
- * initialize/update VS Code decoration types based on these settings.
- * It operates as a singleton to ensure consistent access to configuration.
+ * This class acts as a singleton to provide a single point of access to configuration values
+ * and to initialize VS Code decoration types based on those settings.
  */
 export class Configuration {
     private static _instance: Configuration;
-    private _extensionState: ExtensionState;
 
-    private constructor() {
-        this._extensionState = ExtensionState.getInstance();
-    }
+    private constructor() { }
 
     /**
-     * Returns the singleton instance of the Configuration.
-     * If an instance does not already exist, it creates one.
-     * @returns The singleton instance of Configuration.
+     * Returns the singleton instance of the Configuration class.
      */
     public static getInstance(): Configuration {
         if (!Configuration._instance) {
@@ -28,100 +21,81 @@ export class Configuration {
     }
 
     /**
-     * Retrieves the VS Code configuration for 'pointblank'.
-     * @returns A `vscode.WorkspaceConfiguration` object for the extension.
+     * Retrieves the VS Code workspace configuration for the 'pointblank' extension.
      */
     private getConfiguration(): vscode.WorkspaceConfiguration {
         return vscode.workspace.getConfiguration('pointblank');
     }
 
     /**
-     * Retrieves the configured debounce delay for document and visible range changes.
-     * @returns The debounce delay in milliseconds.
+     * Gets the configured debounce delay for decoration updates.
+     * @returns The delay in milliseconds.
      */
     public getDebounceDelay(): number {
-        return this.getConfiguration().get<number>('debounceDelay') || 15;
+        return this.getConfiguration().get<number>('debounceDelay', 15);
     }
 
     /**
-     * Retrieves the configured viewport buffer size.
-     * @returns The number of extra lines to render above and below the visible viewport.
+     * Gets the configured viewport buffer size. This determines how many extra lines
+     * above and below the visible viewport are rendered to ensure smooth scrolling.
+     * @returns The number of buffer lines.
      */
     public getViewportBuffer(): number {
-        return this.getConfiguration().get<number>('viewportBuffer') || 20;
+        return this.getConfiguration().get<number>('viewportBuffer', 20);
     }
 
     /**
-     * Initializes or re-initializes all VS Code decoration types based on the current
-     * extension configuration. Existing decoration types are disposed to prevent memory leaks.
-     * This method should be called on extension activation and whenever configuration changes.
+     * Returns a map of decoration type names to their corresponding `vscode.DecorationRenderOptions`.
+     * This method provides the raw options needed to create decoration types,
+     * without creating or managing the `vscode.TextEditorDecorationType` objects themselves.
+     * @returns A Map where keys are decoration type names and values are `vscode.DecorationRenderOptions`.
      */
-    public initializeDecorationTypes(): void {
-        const configuration = this.getConfiguration();
+    public getDecorationRenderOptions(): Map<string, vscode.DecorationRenderOptions> {
+        const config = this.getConfiguration();
+        const decorationOptions = new Map<string, vscode.DecorationRenderOptions>();
 
-        // Dispose existing decorations if they exist to prevent memory leaks
-        this._extensionState.disposeDecorationTypes();
-
-
-        /**
-         * Defines the decoration type for custom bullet points using an asterisk (*).
-         * This provides a subtle yellow/gold color to differentiate them.
-         */
-        this._extensionState.setDecorationType('starBulletDecorationType', vscode.window.createTextEditorDecorationType({
-            color: configuration.get('level2Color') || new vscode.ThemeColor('editorWarning.foreground'),
+        // Decoration for '*' bullet points.
+        decorationOptions.set('starBulletDecorationType', {
+            color: config.get('level2Color') || new vscode.ThemeColor('editorWarning.foreground'),
             rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
-        }));
+        });
 
-        /**
-         * Defines the decoration type for custom bullet points using a plus sign (+).
-         * This provides a subtle green color, often indicating additions.
-         */
-        this._extensionState.setDecorationType('plusBulletDecorationType', vscode.window.createTextEditorDecorationType({
-            color: configuration.get('level3Color') || new vscode.ThemeColor('editorGutter.addedBackground'),
+        // Decoration for '+' bullet points.
+        decorationOptions.set('plusBulletDecorationType', {
+            color: config.get('level3Color') || new vscode.ThemeColor('editorGutter.addedBackground'),
             rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
-        }));
+        });
 
-        /**
-         * Defines the decoration type for custom bullet points using a minus sign (-).
-         * This provides a subtle red color, often indicating deletions.
-         */
-        this._extensionState.setDecorationType('minusBulletDecorationType', vscode.window.createTextEditorDecorationType({
-            color: configuration.get('level4Color') || new vscode.ThemeColor('editorGutter.deletedBackground'),
+        // Decoration for '-' bullet points.
+        decorationOptions.set('minusBulletDecorationType', {
+            color: config.get('level4Color') || new vscode.ThemeColor('editorGutter.deletedBackground'),
             rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
-        }));
+        });
 
-        /**
-         * Defines the decoration type for numbered bullet points (e.g., "1.", "2)").
-         * This provides a subtle orange/yellow color for differentiation.
-         */
-        this._extensionState.setDecorationType('numberedBulletDecorationType', vscode.window.createTextEditorDecorationType({
-            color: configuration.get('level5Color') || new vscode.ThemeColor('editorBracketHighlight.foreground3'),
+        // Decoration for numbered bullet points (e.g., "1.", "2)").
+        decorationOptions.set('numberedBulletDecorationType', {
+            color: config.get('level5Color') || new vscode.ThemeColor('editorBracketHighlight.foreground3'),
             rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
-        }));
+        });
 
-        /**
-         * Defines the decoration type for blockquote prefixes (>).
-         * This provides a subtle color for blockquote elements.
-         */
-        this._extensionState.setDecorationType('blockquoteDecorationType', vscode.window.createTextEditorDecorationType({
-            color: configuration.get('blockquoteColor') || new vscode.ThemeColor('editor.foreground'),
-        }));
+        // Decoration for blockquote prefixes ('>').
+        decorationOptions.set('blockquoteDecorationType', {
+            color: config.get('blockquoteColor') || new vscode.ThemeColor('comment'),
+        });
 
-        /**
-         * Defines the decoration type for 'Key::' properties.
-         */
-        this._extensionState.setDecorationType('keyValueDecorationType', vscode.window.createTextEditorDecorationType({
-            color: configuration.get('keyValueColor') || '#6c757d', // Default fallback
+        // Decoration for the key part of 'Key::' properties.
+        decorationOptions.set('keyValueDecorationType', {
+            color: config.get('keyValueColor') || new vscode.ThemeColor('textSeparator.foreground'),
             rangeBehavior: vscode.DecorationRangeBehavior.ClosedOpen,
-        }));
+        });
 
-        /**
-         * Defines the decoration type for typed nodes (e.g., "(Book)").
-         */
-        this._extensionState.setDecorationType('typedNodeDecorationType', vscode.window.createTextEditorDecorationType({
-            color: new vscode.ThemeColor('textLink.foreground'), // Example: use a link-like color
+        // Decoration for typed nodes (e.g., "(Book)").
+        decorationOptions.set('typedNodeDecorationType', {
+            color: new vscode.ThemeColor('textLink.foreground'),
             fontWeight: 'bold',
             rangeBehavior: vscode.DecorationRangeBehavior.ClosedOpen,
-        }));
+        });
+
+        return decorationOptions;
     }
 }

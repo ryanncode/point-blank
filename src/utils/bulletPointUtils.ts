@@ -1,14 +1,29 @@
 import * as vscode from 'vscode';
 
 /**
- * Determines the bullet type and its range based on the line content.
- * This function is extracted from BlockNode to be a stateless utility.
- * @param lineText The full text of the line.
- * @param indent The first non-whitespace character index of the line.
- * @param isCodeBlockDelimiter True if the line is a code block delimiter.
- * @param isExcluded True if the line is excluded from normal parsing (e.g., markdown header).
- * @param lineNumber The line number.
- * @returns An object containing the bulletType and its vscode.Range, or 'none' and undefined range.
+ * Defines the possible types of bullets that can be recognized.
+ */
+export type BulletType = 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'default' | 'atSign' | 'none';
+
+/**
+ * Represents the result of a bullet type determination.
+ */
+export interface BulletInfo {
+    bulletType: BulletType;
+    bulletRange?: vscode.Range;
+}
+
+/**
+ * A stateless utility function to determine the bullet type and its range from a line of text.
+ * This logic is centralized here to be reusable and decoupled from `BlockNode`.
+ *
+ * @param lineText The full text of the line to analyze.
+ * @param indent The starting character index of the content (after leading whitespace).
+ * @param isCodeBlockDelimiter A flag indicating if the line is a code block delimiter (e.g., ```).
+ * @param isExcluded A flag indicating if the line should be excluded from parsing (e.g., a markdown header).
+ * @param lineNumber The zero-based line number in the document.
+ * @returns A `BulletInfo` object containing the detected `bulletType` and its `vscode.Range`.
+ *          Returns type 'none' if no bullet is detected or if the line is excluded.
  */
 export function determineBulletType(
     lineText: string,
@@ -16,31 +31,32 @@ export function determineBulletType(
     isCodeBlockDelimiter: boolean,
     isExcluded: boolean,
     lineNumber: number
-): { bulletType: 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'default' | 'none' | 'atSign'; bulletRange?: vscode.Range } {
+): BulletInfo {
     if (isCodeBlockDelimiter || isExcluded) {
         return { bulletType: 'none' };
     }
 
     const textAfterIndent = lineText.substring(indent);
 
-    // Regex for common bullet types and their ranges
-    const bulletPatterns = [
-        { type: 'atSign', regex: /^(@)\s*/, bulletChar: '@' },
-        { type: 'star', regex: /^(\*)\s*/, bulletChar: '*' },
-        { type: 'plus', regex: /^(\+)\s*/, bulletChar: '+' },
-        { type: 'minus', regex: /^(-)\s*/, bulletChar: '-' },
-        { type: 'default', regex: /^(\u2022)\s*/, bulletChar: '•' },
-        { type: 'numbered', regex: /^(\d+[\.\)])\s*/, bulletChar: '1.' },
-        { type: 'blockquote', regex: /^(>)\s*/, bulletChar: '>' }
+    // Defines the patterns for recognizing different bullet types.
+    const bulletPatterns: { type: BulletType, regex: RegExp }[] = [
+        { type: 'atSign',     regex: /^(@)\s+/ },
+        { type: 'star',       regex: /^(\*)\s+/ },
+        { type: 'plus',       regex: /^(\+)\s+/ },
+        { type: 'minus',      regex: /^(-)\s+/ },
+        { type: 'default',    regex: /^(\u2022)\s+/ }, // Unicode for •
+        { type: 'numbered',   regex: /^(\d+[\.\)])\s+/ },
+        { type: 'blockquote', regex: /^(>)\s+/ }
     ];
 
     for (const pattern of bulletPatterns) {
         const match = textAfterIndent.match(pattern.regex);
         if (match) {
+            // The range covers the bullet character itself plus any trailing whitespace.
             const bulletStart = indent;
-            const bulletEnd = indent + match[0].length; // Use match[0].length to include any matched whitespace
+            const bulletEnd = indent + match[0].length;
             const bulletRange = new vscode.Range(lineNumber, bulletStart, lineNumber, bulletEnd);
-            return { bulletType: pattern.type as any, bulletRange };
+            return { bulletType: pattern.type, bulletRange };
         }
     }
 

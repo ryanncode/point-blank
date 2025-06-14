@@ -2,159 +2,142 @@ import * as vscode from 'vscode';
 import { BlockNode } from '../document/blockNode'; // Use BlockNode
 import { DocumentTree } from '../document/documentTree'; // Import DocumentTree
 import { DecorationCalculator } from './decorationCalculator';
-import { ExtensionState } from '../state/extensionState';
 import { debounce } from '../utils/debounce';
 import { Configuration } from '../config/configuration';
-import { Timer } from '../utils/timer'; // Import Timer utility
+import { ExtensionState } from '../state/extensionState';
 
 /**
- * Manages and applies text editor decorations based on document changes.
- * It orchestrates the decoration updates in a flicker-free manner.
+ * Manages the application of text editor decorations. It orchestrates decoration updates
+ * efficiently by using debouncing and considering only the visible ranges of the editor,
+ * which is crucial for performance in large files.
  */
 export class DecorationManager implements vscode.Disposable {
-    private _extensionState: ExtensionState;
     private _decorationTypes: Map<string, vscode.TextEditorDecorationType> = new Map();
     private _disposables: vscode.Disposable[] = [];
-    // Debounced function for general decoration updates, now including visible ranges
-    private _debouncedUpdateDecorations?: (editor: vscode.TextEditor, tree: DocumentTree) => void;
-    private _screenUpdateTimer: Timer; // Timer for screen updates
+private _debouncedUpdate: (editor: vscode.TextEditor, tree: DocumentTree) => void;
+    private _extensionState: ExtensionState;
 
-    constructor() {
-        this._extensionState = ExtensionState.getInstance();
-        this._screenUpdateTimer = new Timer('Screen Update');
-    }
-
-    /**
-     * Initializes the DecorationManager by setting up decoration types and event listeners.
-     * This should be called after the Configuration has initialized decoration types in ExtensionState.
-     */
-    public initialize(): void {
-        this.initializeDecorationTypesInternal();
+    constructor(extensionState: ExtensionState) {
+        this._extensionState = extensionState;
         const configuration = Configuration.getInstance();
         const debounceDelay = configuration.getDebounceDelay();
-        this._debouncedUpdateDecorations = debounce(this.applyDecorationsInternal.bind(this), debounceDelay);
-
-        // Listen for visible range changes (for viewport-aware rendering)
-        vscode.window.onDidChangeTextEditorVisibleRanges(this.onDidChangeTextEditorVisibleRanges, this, this._disposables);
+        this._debouncedUpdate = debounce(this.applyDecorations.bind(this), debounceDelay);
     }
 
-    private initializeDecorationTypesInternal(): void {
-        const decorationTypeNames = [
-            'starBulletDecorationType',
-            'plusBulletDecorationType',
-            'minusBulletDecorationType',
-            'numberedBulletDecorationType',
-            'blockquoteDecorationType',
-            'keyValueDecorationType',
-            'typedNodeDecorationType'
-        ];
-        for (const typeName of decorationTypeNames) {
-            const decorationType = this._extensionState.getDecorationType(typeName);
-            if (decorationType) {
-                this._decorationTypes.set(typeName, decorationType);
+    /**
+     * Initializes the manager by loading decoration types from the global state
+     * and setting up a listener for viewport changes.
+     */
+    public initialize(): void {
+        this.reloadDecorationTypes(); // Initial load after configuration is ready
+        vscode.window.onDidChangeTextEditorVisibleRanges(this.handleVisibilityChange, this, this._disposables);
+    }
+
+    /**
+     * Clears existing decoration types and reloads them from ExtensionState.
+     * This should be called when configuration changes or on initial activation
+     * after decoration types have been initialized in ExtensionState.
+     */
+    public reloadDecorationTypes(): void {
+        this._decorationTypes.forEach(type => type.dispose()); // Dispose existing types
+        this._decorationTypes.clear(); // Clear existing types
+        this.loadDecorationTypes();    // Reload from Configuration
+    }
+
+    /**
+     * Loads the configured decoration types from `Configuration` into a local map for quick access.
+     */
+    private loadDecorationTypes(): void {
+        const configuration = Configuration.getInstance();
+        const renderOptions = configuration.getDecorationRenderOptions();
+
+        renderOptions.forEach((options, key) => {
+            if (options) {
+                const decorationType = vscode.window.createTextEditorDecorationType(options);
+                this._decorationTypes.set(key, decorationType);
             }
+        });
+    }
+
+    /**
+     * The main entry point for triggering a decoration update. It's called by `DocumentModel`
+     * when the document tree changes. The update is debounced to prevent excessive processing.
+     * @param tree The current, immutable `DocumentTree` of the document.
+     */
+    public updateDecorations(tree: DocumentTree): void {
+        const activeEditor = vscode.window.activeTextEditor;
+        if (activeEditor && activeEditor.document.uri.toString() === tree.document.uri.toString()) {
+            this._debouncedUpdate(activeEditor, tree);
         }
     }
 
     /**
-     * Main entry point for updating decorations. This method should be called
-     * by DocumentModel whenever the document tree changes.
-     * It uses a debounced mechanism to prevent excessive updates.
-     * @param tree The current `DocumentTree`.
+     * Handles changes in the editor's visible ranges (e.g., scrolling).
+     * It triggers a decoration update to ensure that newly visible lines are decorated correctly.
      */
-    public updateDecorations(tree: DocumentTree): void {
-        const activeEditor = this._extensionState.activeEditor;
-        if (!activeEditor || activeEditor.document.uri.toString() !== tree.document.uri.toString() || !this._debouncedUpdateDecorations) {
-            return;
-        }
-        this._debouncedUpdateDecorations(activeEditor, tree);
-    }
-
-    private onDidChangeTextEditorVisibleRanges(event: vscode.TextEditorVisibleRangesChangeEvent): void {
-        const activeEditor = this._extensionState.activeEditor;
+    private handleVisibilityChange(event: vscode.TextEditorVisibleRangesChangeEvent): void {
+        const activeEditor = vscode.window.activeTextEditor;
         if (activeEditor && event.textEditor === activeEditor) {
             const documentModel = this._extensionState.getDocumentModel(activeEditor.document.uri.toString());
             if (documentModel) {
-                // Trigger an update
-                this.updateDecorations(documentModel.documentTree);
+                this._debouncedUpdate(activeEditor, documentModel.documentTree);
             }
         }
     }
 
-    // Removed onDidChangeTextEditorVisibleRanges as it's now handled by the unified updateDecorations
-    // and the debounced nature of applyDecorationsInternal.
-
-
     /**
-     * Internal method to calculate and apply decorations. This is the core
-     * logic that gets debounced.
+     * The core logic for applying decorations. It calculates decorations only for the nodes
+     * within the visible viewport (plus a buffer) and applies them to the editor.
      * @param editor The active text editor.
      * @param tree The current `DocumentTree`.
      */
-    private applyDecorationsInternal(editor: vscode.TextEditor, tree: DocumentTree): void {
-        if (!editor) {
-            return;
-        }
-
-        this._screenUpdateTimer.start();
-
+    private applyDecorations(editor: vscode.TextEditor, tree: DocumentTree): void {
         const decorationsToApply = new Map<string, vscode.DecorationOptions[]>();
-        for (const key of this._decorationTypes.keys()) {
-            decorationsToApply.set(key, []);
-        }
+        this._decorationTypes.forEach((_, key) => decorationsToApply.set(key, []));
 
-        const configuration = Configuration.getInstance();
-        const viewportBuffer = configuration.getViewportBuffer();
+        const nodesToDecorate = this.getNodesInViewport(editor, tree);
+        DecorationCalculator.calculateDecorations(nodesToDecorate, decorationsToApply);
 
-        const currentVisibleRanges = editor.visibleRanges;
-
-        const allNodesToDecorate: BlockNode[] = [];
-        const processedLineNumbers = new Set<number>();
-
-        for (let i = 0; i < currentVisibleRanges.length; i++) {
-            const currentRange = currentVisibleRanges[i];
-
-            const startLine = Math.max(0, currentRange.start.line - viewportBuffer);
-
-            let endLine: number;
-            const bufferedEndLine = Math.min(editor.document.lineCount - 1, currentRange.end.line + viewportBuffer);
-
-            if (i + 1 < currentVisibleRanges.length) {
-                const nextRangeStartLine = currentVisibleRanges[i + 1].start.line;
-                endLine = Math.min(bufferedEndLine, nextRangeStartLine - 1);
-            } else {
-                endLine = bufferedEndLine;
-            }
-
-            // Ensure endLine doesn't go below startLine, especially for very small ranges or large buffers
-            endLine = Math.max(startLine, endLine);
-
-            const nodesInCurrentBufferedRange = tree.getNodesInLineRange(startLine, endLine);
-
-            for (const node of nodesInCurrentBufferedRange) {
-                if (!processedLineNumbers.has(node.lineNumber)) {
-                    allNodesToDecorate.push(node);
-                    processedLineNumbers.add(node.lineNumber);
-                }
-            }
-        }
-
-        DecorationCalculator.calculateDecorations(allNodesToDecorate, decorationsToApply);
-        // Apply the newly calculated decorations to the editor
-        for (const [typeName, decorationType] of this._decorationTypes.entries()) {
-            const optionsToApply = decorationsToApply.get(typeName) || [];
-            editor.setDecorations(decorationType, optionsToApply);
-        }
-        this._screenUpdateTimer.stop();
+        this._decorationTypes.forEach((decorationType, typeName) => {
+            editor.setDecorations(decorationType, decorationsToApply.get(typeName) || []);
+        });
     }
 
     /**
-     * Disposes of all resources held by the DecorationManager.
+     * Determines which nodes are currently within the visible viewport, including a configured buffer.
+     * This optimization prevents processing the entire document on every update.
+     * @param editor The active text editor.
+     * @param tree The document's `DocumentTree`.
+     * @returns An array of `BlockNode`s that need to be decorated.
+     */
+    private getNodesInViewport(editor: vscode.TextEditor, tree: DocumentTree): BlockNode[] {
+        const configuration = Configuration.getInstance();
+        const viewportBuffer = configuration.getViewportBuffer();
+        const nodesInViewport: BlockNode[] = [];
+        const processedLines = new Set<number>();
+
+        for (const range of editor.visibleRanges) {
+            const startLine = Math.max(0, range.start.line - viewportBuffer);
+            const endLine = Math.min(editor.document.lineCount - 1, range.end.line + viewportBuffer);
+
+            const nodesInRange = tree.getNodesInLineRange(startLine, endLine);
+            for (const node of nodesInRange) {
+                if (!processedLines.has(node.lineNumber)) {
+                    nodesInViewport.push(node);
+                    processedLines.add(node.lineNumber);
+                }
+            }
+        }
+        return nodesInViewport;
+    }
+
+    /**
+     * Disposes of all resources held by the `DecorationManager`, including event listeners
+     * and the decoration types themselves, to prevent memory leaks.
      */
     public dispose(): void {
         this._disposables.forEach(d => d.dispose());
         this._disposables = [];
-        // Dispose of decoration types to prevent memory leaks
         this._decorationTypes.forEach(type => type.dispose());
         this._decorationTypes.clear();
     }

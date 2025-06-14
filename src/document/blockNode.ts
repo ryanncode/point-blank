@@ -9,184 +9,145 @@ export interface KeyValueProperty {
 }
 
 /**
- * Represents a logical block in the document, encapsulating its parsed properties
- * and its hierarchical relationship with other blocks.
+ * Represents a logical block or line in the document. It's an immutable object that
+ * encapsulates the parsed properties of a single line, such as its indentation,
+ * bullet type, and hierarchical relationship with other nodes.
  */
 export class BlockNode {
+    // Core properties
     public readonly line: vscode.TextLine;
     public readonly lineNumber: number;
-    public readonly text: string; // Full text of the line
-    public readonly trimmedText: string; // Trimmed text of the line
-    public readonly indent: number; // First non-whitespace character index
+    public readonly text: string;
+    public readonly indent: number;
+
+    // Parsed state properties
     public readonly isKeyValue: boolean;
-    public readonly keyValue?: KeyValueProperty; // If this node is a key-value pair
+    public readonly keyValue?: KeyValueProperty;
     public readonly isTypedNode: boolean;
     public readonly type?: string;
-    public readonly typedNodeRange?: vscode.Range; // Range of the typed node (e.g., "(Book)")
-    public readonly isCodeBlockDelimiter: boolean; // To handle code blocks
-    public readonly isExcluded: boolean; // To handle excluded lines (e.g., Markdown headers)
+    public readonly typedNodeRange?: vscode.Range;
+    public readonly isCodeBlockDelimiter: boolean;
+    public readonly isExcluded: boolean;
     public readonly bulletType: 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'default' | 'none' | 'atSign';
     public readonly bulletRange?: vscode.Range;
 
-    // Hierarchical properties
+    // Hierarchy properties
     public readonly parent?: BlockNode;
     public readonly children: readonly BlockNode[];
 
     constructor(
         line: vscode.TextLine,
         lineNumber: number,
-        isExcluded: boolean, // Determined by parser based on code blocks, etc.
+        isExcluded: boolean,
         parent?: BlockNode,
-        children: BlockNode[] = [],
-        bulletType: 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'default' | 'none' | 'atSign' = 'none',
-        bulletRange?: vscode.Range
+        children: BlockNode[] = []
     ) {
         this.line = line;
         this.lineNumber = lineNumber;
         this.text = line.text;
-        this.trimmedText = line.text.trim();
         this.indent = line.firstNonWhitespaceCharacterIndex;
         this.isExcluded = isExcluded;
         this.parent = parent;
         this.children = children;
 
-        const parsedProps = this.parseLineContent(this.trimmedText);
-        this.isKeyValue = parsedProps.isKeyValue;
-        this.keyValue = parsedProps.keyValue;
-        this.isTypedNode = parsedProps.isTypedNode;
-        this.type = parsedProps.type;
-        this.typedNodeRange = parsedProps.typedNodeRange;
-        this.isCodeBlockDelimiter = parsedProps.isCodeBlockDelimiter;
+        // Perform all parsing upon construction to ensure immutability.
+        const { isKeyValue, keyValue, isTypedNode, type, typedNodeRange, isCodeBlockDelimiter } = this.parseLineContent();
+        this.isKeyValue = isKeyValue;
+        this.keyValue = keyValue;
+        this.isTypedNode = isTypedNode;
+        this.type = type;
+        this.typedNodeRange = typedNodeRange;
+        this.isCodeBlockDelimiter = isCodeBlockDelimiter;
 
-        // If bulletType and bulletRange are not explicitly provided, determine them
-        if (bulletType === 'none' || bulletRange === undefined) {
-            const determinedBullet = determineBulletType(this.text, this.indent, this.isCodeBlockDelimiter, this.isExcluded, this.lineNumber);
-            this.bulletType = determinedBullet.bulletType;
-            this.bulletRange = determinedBullet.bulletRange;
-        } else {
-            this.bulletType = bulletType;
-            this.bulletRange = bulletRange;
-        }
+        const { bulletType, bulletRange } = determineBulletType(this.text, this.indent, this.isCodeBlockDelimiter, this.isExcluded, this.lineNumber);
+        this.bulletType = bulletType;
+        this.bulletRange = bulletRange;
     }
 
     /**
-     * Parses the content of the line to determine its properties.
-     * This method is internal and should only be called during construction.
+     * Parses the line's content to identify special structures like key-value pairs,
+     * typed nodes, or code block delimiters.
+     * @returns An object containing the parsed properties.
      */
-    private parseLineContent(trimmedText: string): {
-        isKeyValue: boolean;
-        keyValue?: KeyValueProperty;
-        isTypedNode: boolean;
-        type?: string;
-        typedNodeRange?: vscode.Range;
-        isCodeBlockDelimiter: boolean;
-    } {
-        let isKeyValue = false;
-        let keyValue: KeyValueProperty | undefined = undefined;
-        let isTypedNode = false;
-        let type: string | undefined = undefined;
-        let typedNodeRange: vscode.Range | undefined = undefined;
-        let isCodeBlockDelimiter = false;
+    private parseLineContent() {
+        const trimmedText = this.text.trim();
 
-        // Check for code block delimiter
+        // Check for code block delimiter: ```
         if (trimmedText.startsWith('```')) {
-            isCodeBlockDelimiter = true;
+            return { isCodeBlockDelimiter: true, isKeyValue: false, isTypedNode: false };
         }
 
-        // Check for Key:: Value pattern
+        // Check for Key:: Value pattern.
         const keyValueMatch = trimmedText.match(/^(-\s*)?(\S+::)\s*(.*)/);
         if (keyValueMatch) {
-            isKeyValue = true;
-            const leadingDash = keyValueMatch[1] || ''; // Capture group 1: optional "- "
-            const keyPart = keyValueMatch[2]; // Capture group 2: "Key::"
-            const valuePart = keyValueMatch[3]; // Capture group 3: "Value"
-            const keyStartCharacter = this.indent + leadingDash.length;
-            const keyRange = new vscode.Range(this.lineNumber, keyStartCharacter, this.lineNumber, keyStartCharacter + keyPart.length);
+            const leadingDash = keyValueMatch[1] || '';
+            const keyPart = keyValueMatch[2];
+            const valuePart = keyValueMatch[3];
+            const keyStartChar = this.indent + leadingDash.length;
+            const keyRange = new vscode.Range(this.lineNumber, keyStartChar, this.lineNumber, keyStartChar + keyPart.length);
             const fullRange = new vscode.Range(this.lineNumber, 0, this.lineNumber, this.text.length);
-            keyValue = {
+            const keyValue: KeyValueProperty = {
                 key: keyPart.slice(0, -2), // Remove "::"
                 value: valuePart,
                 range: fullRange,
                 keyRange: keyRange
             };
+            return { isKeyValue: true, keyValue, isTypedNode: false, isCodeBlockDelimiter: false };
         }
 
-        // Check for Typed Node pattern: - (TypeName)
+        // Check for Typed Node pattern: (TypeName)
         const typedNodeMatch = trimmedText.match(/^\s*\((.+)\)/);
         if (typedNodeMatch) {
-            isTypedNode = true;
-            type = typedNodeMatch[1];
-            const startIndex = this.indent + typedNodeMatch[0].indexOf('(');
-            const endIndex = startIndex + typedNodeMatch[0].length - typedNodeMatch[0].indexOf('(');
-            typedNodeRange = new vscode.Range(this.lineNumber, startIndex, this.lineNumber, endIndex);
+            const type = typedNodeMatch[1];
+            const startIndex = this.text.indexOf(`(${type})`);
+            const endIndex = startIndex + type.length + 2; // +2 for parentheses
+            const typedNodeRange = new vscode.Range(this.lineNumber, startIndex, this.lineNumber, endIndex);
+            return { isTypedNode: true, type, typedNodeRange, isKeyValue: false, isCodeBlockDelimiter: false };
         }
 
-        return {
-            isKeyValue,
-            keyValue,
-            isTypedNode,
-            type,
-            typedNodeRange,
-            isCodeBlockDelimiter
-        };
+        return { isKeyValue: false, isTypedNode: false, isCodeBlockDelimiter: false };
     }
 
     /**
-     * Determines the bullet type and its range based on the line content.
-     * @param lineText The full text of the line.
-     * @param indent The first non-whitespace character index of the line.
-     * @param isCodeBlockDelimiter True if the line is a code block delimiter.
-     * @param isExcluded True if the line is excluded from normal parsing (e.g., markdown header).
-     * @param lineNumber The line number.
-     * @returns An object containing the bulletType and its vscode.Range, or 'none' and undefined range.
-     */
-
-    /**
-     * Creates a new BlockNode with updated children.
-     * This is useful for maintaining immutability when the tree structure changes.
+     * Creates a new `BlockNode` instance with updated children.
+     * This method is essential for maintaining the immutability of the document tree.
+     * @param newChildren The new array of child nodes.
+     * @returns A new `BlockNode` instance.
      */
     public withChildren(newChildren: BlockNode[]): BlockNode {
-        return new BlockNode(
-            this.line,
-            this.lineNumber,
-            this.isExcluded,
-            this.parent,
-            newChildren,
-            this.bulletType as 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'default' | 'none' | 'atSign',
-            this.bulletRange
-        );
+        return new BlockNode(this.line, this.lineNumber, this.isExcluded, this.parent, newChildren);
     }
 
     /**
-     * Creates a new BlockNode with an updated parent.
+     * Creates a new `BlockNode` instance with an updated parent.
+     * @param newParent The new parent node.
+     * @returns A new `BlockNode` instance.
      */
     public withParent(newParent?: BlockNode): BlockNode {
-        return new BlockNode(
-            this.line,
-            this.lineNumber,
-            this.isExcluded,
-            newParent,
-            Array.from(this.children), // Ensure children array is copied
-            this.bulletType as 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'default' | 'none' | 'atSign',
-            this.bulletRange
-        );
+        return new BlockNode(this.line, this.lineNumber, this.isExcluded, newParent, [...this.children]);
     }
 
     /**
-     * Compares two BlockNodes to determine if their properties relevant to decoration have changed.
-     * This is a shallow comparison for the node's own properties, not its children.
+     * Performs a shallow comparison to check if two `BlockNode`s have different content
+     * relevant to decoration. This is used to optimize re-rendering.
+     * @param otherNode The other `BlockNode` to compare against.
+     * @returns `true` if the content is different, `false` otherwise.
      */
     public isContentDifferent(otherNode: BlockNode): boolean {
-        return this.text !== otherNode.text ||
-               this.indent !== otherNode.indent ||
-               this.isKeyValue !== otherNode.isKeyValue ||
-               this.isTypedNode !== otherNode.isTypedNode ||
-               this.isCodeBlockDelimiter !== otherNode.isCodeBlockDelimiter ||
-               this.isExcluded !== otherNode.isExcluded ||
-               this.bulletType !== otherNode.bulletType ||
-               // Compare bulletRange:
-               (this.bulletRange === undefined && otherNode.bulletRange !== undefined) ||
-               (this.bulletRange !== undefined && otherNode.bulletRange === undefined) ||
-               (this.bulletRange !== undefined && otherNode.bulletRange !== undefined && !this.bulletRange.isEqual(otherNode.bulletRange));
+        if (this.text !== otherNode.text ||
+            this.bulletType !== otherNode.bulletType ||
+            this.isKeyValue !== otherNode.isKeyValue ||
+            this.isTypedNode !== otherNode.isTypedNode) {
+            return true;
+        }
+
+        // Deep compare bulletRange only if necessary.
+        const range1 = this.bulletRange;
+        const range2 = otherNode.bulletRange;
+        if ((range1 && !range2) || (!range1 && range2) || (range1 && range2 && !range1.isEqual(range2))) {
+            return true;
+        }
+
+        return false;
     }
 }

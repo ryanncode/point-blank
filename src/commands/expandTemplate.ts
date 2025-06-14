@@ -2,72 +2,73 @@ import * as vscode from 'vscode';
 import { TemplateService } from '../templates/templateService';
 import { DocumentModel } from '../document/documentModel';
 
+/**
+ * Expands a template based on a type name (e.g., "Book") triggered by "@TypeName ".
+ * This function replaces the trigger text with a formatted template from user settings.
+ *
+ * @param typeName The name of the template type to expand.
+ * @param _documentModel The document model, passed for context but not directly used,
+ *                       as the `onDidChangeTextDocument` event handles the re-parse.
+ */
 export async function expandTemplateCommand(typeName: string, _documentModel: DocumentModel): Promise<void> {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
         return;
     }
 
-    const document = editor.document;
     const position = editor.selection.active;
-    const line = document.lineAt(position.line);
+    const line = editor.document.lineAt(position.line);
 
-    // The typeName is passed directly from extension.ts, so no need to re-parse the line.
+    // Retrieve the user's configured tab size
+    const editorConfig = vscode.workspace.getConfiguration('editor');
+    const tabSize = editorConfig.get<number>('tabSize', 2); // Default to 2 if not set
+
+    // Retrieve the template content from the TemplateService.
     const templateService = TemplateService.getInstance();
     const templateContent = await templateService.getTemplate(typeName);
 
     if (templateContent === undefined) {
-        vscode.window.showWarningMessage(`No template found for type: ${typeName}`);
+        vscode.window.showWarningMessage(`Point Blank: No template found for type "${typeName}".`);
         return;
     }
 
-    // Declare and initialize newTitleLineContent outside the editBuilder callback
     let newTitleLineContent: string = '';
 
     await editor.edit(editBuilder => {
-        // Delete the trigger text (e.g., "@Book ")
-        // The range should cover from the first non-whitespace character to the cursor position (after the space)
-        // Calculate the start character of the text to be deleted.
-        // This should be the index of the '@' symbol.
+        // --- 1. Delete the Trigger Text ---
+        // Find the '@' symbol to determine the start of the trigger text.
         const atSymbolIndex = line.text.indexOf('@', line.firstNonWhitespaceCharacterIndex);
         if (atSymbolIndex === -1) {
-            // Fallback, should not happen if extension.ts triggers correctly
+            // This should not happen if the command is triggered correctly by the InlineCompletionProvider.
             return;
         }
 
-        const deleteStartChar = atSymbolIndex;
-        const deleteEndChar = position.character; // End at the cursor position (after the space)
-
-        // The actual range to delete, which includes '@TypeName' and the trailing space.
-        const deleteRange = new vscode.Range(line.lineNumber, deleteStartChar, line.lineNumber, deleteEndChar);
+        // The range to delete includes everything from the '@' to the cursor (which is after the space).
+        const deleteRange = new vscode.Range(line.lineNumber, atSymbolIndex, line.lineNumber, position.character);
         editBuilder.delete(deleteRange);
 
-        // Get the current leading whitespace for indentation
+        // --- 2. Prepare and Insert New Content ---
         const currentIndent = line.text.substring(0, line.firstNonWhitespaceCharacterIndex);
+        const propertyIndent = ' '.repeat(tabSize); // Use user's tab size for property indentation
 
-        // Insert the new title line, ensuring it starts with a bullet point
-        // Insert the new title line, ensuring it starts with the original indentation
-        // and the (TypeName) format.
-        newTitleLineContent = `${currentIndent}(${typeName}) `; // Assign value here
+        // Create the new title line, e.g., "  (Book) "
+        newTitleLineContent = `${currentIndent}(${typeName}) `;
         editBuilder.insert(line.range.start, newTitleLineContent);
 
-        // Insert template lines with appropriate indentation
+        // Format and insert the template properties, indented under the title line.
         const templateLines = templateContent.split('\n').filter(l => l.trim() !== '');
-        let propertiesText = "";
-        templateLines.forEach(prop => {
-            // Properties should be indented relative to the typed node line
-            propertiesText += `\n${currentIndent}  - ${prop}`; // Keep bullet for properties, indent by 2 spaces
-        });
+        const propertiesText = templateLines
+            .map(prop => `\n${currentIndent}${propertyIndent}${prop}`) // Indent properties by user's tab size, no bullet.
+            .join('');
         editBuilder.insert(line.range.end, propertiesText);
     });
 
-    // Set the cursor position back to the end of the newTitleLine
+    // --- 3. Reposition the Cursor ---
+    // Move the cursor to the end of the newly inserted title line for a smooth editing flow.
     const newCursorPosition = new vscode.Position(line.lineNumber, newTitleLineContent.length);
     editor.selection = new vscode.Selection(newCursorPosition, newCursorPosition);
 
-    // After the edit is complete, explicitly trigger a re-parse and re-decoration.
-    // This ensures the parser sees the *new* text and applies correct decorations.
-    // The documentModel is passed, but explicit re-parsing/re-decoration is not needed here.
-    // The onDidChangeTextDocument event in DocumentModel will handle it automatically
-    // after the editor.edit operation completes.
+    // Note: No explicit re-parse is needed here. The `editor.edit` operation triggers
+    // the `onDidChangeTextDocument` event, which the `DocumentModel` listens to.
+    // The `DocumentModel` then handles the re-parsing and decoration updates automatically.
 }

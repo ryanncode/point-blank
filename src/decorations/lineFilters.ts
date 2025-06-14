@@ -1,35 +1,42 @@
 import * as vscode from 'vscode';
 
 /**
- * Checks if a given line should be excluded from bullet point decoration.
- * This function identifies various markdown syntax elements that should not be treated as list items.
- * Fenced code blocks are handled by state in the decoration applier and are not checked here.
+ * Checks if a line of text should be excluded from the standard parsing and decoration logic.
+ * This is used to ignore lines that have special Markdown significance, such as headers,
+ * horizontal rules, or other syntax that should not be treated as a regular text line.
  *
- * @param line The `vscode.TextLine` object to check.
- * @returns `true` if the line should be excluded, `false` otherwise.
+ * Note: Fenced code blocks (` ``` `) are handled by the `DocumentParser`'s state machine
+ * and are not checked by this function.
+ *
+ * @param line The `vscode.TextLine` to check.
+ * @returns `true` if the line should be excluded from standard processing, `false` otherwise.
  */
 export function isExcludedLine(line: vscode.TextLine): boolean {
     const text = line.text;
-
-    // Markdown ATX headers: #, ##, etc.
-    // Can be preceded by up to 3 spaces.
-    if (text.match(/^[ ]{0,3}#+\s/)) {
-        return true;
-    }
     const trimmedText = text.trim();
-    // Setext header underlines: === or --- (at least 3 characters)
-    if (trimmedText.match(/^[=-]{3,}$/)) {
+
+    // Regex for ATX headers (e.g., #, ##) which can be preceded by up to 3 spaces.
+    const atxHeaderRegex = /^[ ]{0,3}#+\s/;
+    if (atxHeaderRegex.test(text)) {
         return true;
     }
 
-    // Horizontal rules: ***, ---, ___ (at least 3 characters, with optional spaces)
-    if (trimmedText.match(/^(\* *){3,}$|^(- *){3,}$|^(_ *){3,}$/)) {
+    // Regex for Setext header underlines (e.g., ===, ---).
+    const setextHeaderRegex = /^[=-]{3,}$/;
+    if (setextHeaderRegex.test(trimmedText)) {
         return true;
     }
 
-    // Typed node trigger: @TypeName
-    // Matches lines starting with @ followed by zero or more word characters.
-    if (text.match(/^\s*@\w*$/)) {
+    // Regex for horizontal rules (e.g., ***, ---, ___), allowing for spaces between characters.
+    const horizontalRuleRegex = /^(\* *){3,}$|^(- *){3,}$|^(_ *){3,}$/;
+    if (horizontalRuleRegex.test(trimmedText)) {
+        return true;
+    }
+
+    // Regex for the typed node trigger (e.g., `@TypeName`). This prevents decoration
+    // while the user is typing the trigger.
+    const typedNodeTriggerRegex = /^\s*@\w*$/;
+    if (typedNodeTriggerRegex.test(text)) {
         return true;
     }
 
