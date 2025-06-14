@@ -37,7 +37,7 @@ export class PasteWithBullets {
                     // Preserve existing bullet from clipboard
                     finalFirstLineContent = firstClipboardLineContent.trim();
                 }
-                clipboardProcessedLines.push(' '.repeat(currentLineIndentation) + finalFirstLineContent);
+                clipboardProcessedLines.push(' '.repeat(currentLineIndentation + firstClipboardLineOriginalIndent) + finalFirstLineContent);
 
             } else {
                 // Scenario B: Pasting mid-line (insert text, remove bullet from pasted content)
