@@ -1,0 +1,108 @@
+:root {
+    --background-color: #22272e; /* Dark background */
+    --text-color: #adbac7; /* Light grey text */
+    --primary-color: #539bf5; /* Blue for links/accents */
+    --secondary-text-color: #808080; /* Blockquote/secondary text */
+    --border-color: #444c56; /* Subtle border for elements */
+    --header-bg: #2d333b; /* Slightly lighter dark for header */
+    --footer-bg: #2d333b; /* Slightly lighter dark for footer */
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+    margin: 0;
+    padding: 0;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    line-height: 1.6;
+}
+
+header {
+    background-color: var(--header-bg);
+    color: #fff;
+    padding: 1.5em 0;
+    text-align: center;
+    border-bottom: 1px solid var(--border-color);
+}
+
+header h1 {
+    margin: 0;
+    font-size: 2em;
+}
+
+nav ul {
+    padding: 0;
+    list-style: none;
+    display: flex;
+    justify-content: center;
+    margin-top: 1em;
+}
+
+nav ul li {
+    margin: 0 20px;
+}
+
+nav ul li a {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.3s ease;
+}
+
+nav ul li a:hover {
+    color: #c8e1ff; /* Lighter blue on hover */
+}
+
+main {
+    padding: 40px 20px;
+    max-width: 1000px;
+    margin: 30px auto;
+    background-color: #2d333b; /* Slightly lighter dark for content area */
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+section {
+    margin-bottom: 40px;
+    padding-bottom: 20px;
+    border-bottom: 1px dashed var(--border-color);
+}
+
+section:last-child {
+    border-bottom: none;
+}
+
+h2 {
+    color: var(--primary-color);
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 10px;
+    margin-top: 0;
+    font-size: 1.8em;
+}
+
+h3 {
+    color: var(--text-color);
+    font-size: 1.4em;
+    margin-top: 25px;
+}
+
+p, ul, ol {
+    margin-bottom: 1em;
+}
+
+code {
+    background-color: #3e4451;
+    color: #adbac7;
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+}
+
+footer {
+    text-align: center;
+    padding: 25px;
+    background-color: var(--footer-bg);
+    color: var(--secondary-text-color);
+    margin-top: 40px;
+    border-top: 1px solid var(--border-color);
+}
