@@ -120,14 +120,15 @@ export class DocumentParser {
 
     /**
      * Reconstructs the full immutable tree from a list of nodes that have their parent references set.
-     * @param nodes The list of all nodes.
-     * @returns An array of root nodes with their children correctly populated.
+     * This function ensures that all parent and child links point to the correct, final immutable instances.
+     * @param nodes The list of all nodes with their initial parent references set.
+     * @returns An array of root nodes with their children and parent references correctly populated.
      */
     private reconstructImmutableTree(nodes: BlockNode[]): BlockNode[] {
-        const nodeMap = new Map(nodes.map(node => [node.lineNumber, node]));
         const childrenMap = new Map<number, BlockNode[]>();
+        const newNodesMap = new Map<number, BlockNode>(); // Map to store the final, immutable nodes by line number
 
-        // Create a map of children for each parent.
+        // Pass 1: Populate childrenMap with original nodes
         for (const node of nodes) {
             if (node.parent) {
                 if (!childrenMap.has(node.parent.lineNumber)) {
@@ -137,24 +138,43 @@ export class DocumentParser {
             }
         }
 
-        const newNodes: BlockNode[] = [];
-        const rootNodes: BlockNode[] = [];
+        // Pass 2: Create new, immutable nodes with correct children. Iterate backwards to ensure children are processed before parents.
+        const nodesInReverseOrder = [...nodes].reverse();
+        for (const oldNode of nodesInReverseOrder) {
+            const childrenOfOldNode = childrenMap.get(oldNode.lineNumber) || [];
+            const newChildren: BlockNode[] = [];
 
-        // Create new, immutable nodes with the correct children.
-        for (const oldNode of nodes) {
-            const newChildren = childrenMap.get(oldNode.lineNumber) || [];
+            // Get the new instances of children from newNodesMap
+            for (const child of childrenOfOldNode) {
+                const newChild = newNodesMap.get(child.lineNumber);
+                if (newChild) {
+                    newChildren.push(newChild);
+                }
+            }
             const newNode = oldNode.withChildren(newChildren);
-            nodeMap.set(newNode.lineNumber, newNode);
-            newNodes.push(newNode);
+            newNodesMap.set(newNode.lineNumber, newNode);
         }
 
-        // Set the correct parent references on the new nodes and identify root nodes.
-        for (const newNode of newNodes) {
-            if (!newNode.parent) { // Only add root nodes
-                rootNodes.push(newNode);
+        // Pass 3: Create final nodes with correct parent references and identify root nodes.
+        const finalRootNodes: BlockNode[] = [];
+        for (const oldNode of nodes) {
+            const newNode = newNodesMap.get(oldNode.lineNumber)!; // Get the node with correct children
+            let finalNode: BlockNode = newNode;
+
+            if (oldNode.parent) {
+                const newParent = newNodesMap.get(oldNode.parent.lineNumber);
+                if (newParent) {
+                    finalNode = newNode.withParent(newParent); // Create a new instance with the correct parent
+                    newNodesMap.set(finalNode.lineNumber, finalNode); // Update map with this final instance
+                }
+            }
+
+            // Only add root nodes to the final list
+            if (!finalNode.parent) {
+                finalRootNodes.push(finalNode);
             }
         }
 
-        return rootNodes;
+        return finalRootNodes;
     }
 }

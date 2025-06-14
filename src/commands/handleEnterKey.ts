@@ -32,6 +32,7 @@ export class EnterKeyHandler {
             return;
         }
 
+
         const currentLine = document.lineAt(position.line);
         const currentBlockNode = documentModel.documentTree.getNodeAtLine(position.line);
 
@@ -105,10 +106,9 @@ export class EnterKeyHandler {
         // Case 2: Cursor is on a property line of the typed node.
         const currentChildIndex = typedNodeChildren.findIndex((child: BlockNode) => child.lineNumber === currentBlockNode.lineNumber);
         if (currentChildIndex !== -1) {
-            if (currentBlockNode.isKeyValue) {
-                // If it's a key-value pair
-                if (currentBlockNode.keyValue && (currentBlockNode.keyValue.value.trim().length === 0 || position.character >= currentBlockNode.line.range.end.character)) {
-                    // Navigation logic: empty value or cursor at the end of the line
+                const trimmedLineEnd = currentBlockNode.line.text.trimEnd().length;
+                if (position.character >= trimmedLineEnd) {
+                    // Navigation logic
                     if (currentChildIndex < typedNodeChildren.length - 1) {
                         this.moveCursorToNodeValue(editor, typedNodeChildren[currentChildIndex + 1]);
                     } else {
@@ -117,15 +117,10 @@ export class EnterKeyHandler {
                         await this.insertNewLineAndPositionCursor(editor, insertLineNum, indent);
                     }
                 } else {
-                    // Line splitting logic: non-empty value and cursor in the middle
+                    // Line splitting logic
                     await this.splitPropertyLine(editor, position, document);
                 }
-            } else {
-                // If it's not a key-value pair (e.g., a bullet point child of a typed node)
-                // Line splitting logic
-                await this.splitPropertyLine(editor, position, document);
-            }
-            return true; // Always return true if handled within a typed node property line
+                return true; // Always return true if handled within a typed node property line
         }
         return false;
     }
