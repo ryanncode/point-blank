@@ -164,12 +164,39 @@ export class EnterKeyHandler {
         }
 
         // If not on a folded block's title line or block is not folded, execute default Enter key action
-        await vscode.commands.executeCommand('type', { text: '\n' });
+        const line = document.lineAt(position.line);
+        const textAfterCursor = line.text.substring(position.character);
+
+        if (textAfterCursor.length > 0) {
+            await EnterKeyHandler.insertBulletPointAndMoveText(editor, position, document);
+        } else {
+            await vscode.commands.executeCommand('type', { text: '\n' });
+        }
 
         if (EnterKeyHandler.enabled) {
             foldingLogicTimer.stop();
             enterKeyTimer.stop();
         }
+    }
+
+    private static async insertBulletPointAndMoveText(editor: vscode.TextEditor, position: vscode.Position, document: vscode.TextDocument): Promise<void> {
+        const line = document.lineAt(position.line);
+        const textAfterCursor = line.text.substring(position.character);
+        const indentation = line.text.substring(0, line.firstNonWhitespaceCharacterIndex);
+
+        await editor.edit(editBuilder => {
+            // Delete text after cursor on current line
+            const rangeToDelete = new vscode.Range(position, line.range.end);
+            editBuilder.delete(rangeToDelete);
+            
+            // Insert a new line with a bullet point, indentation, and the text from after the cursor
+            const textToInsert = `\n${indentation}• ${textAfterCursor}`;
+            editBuilder.insert(position, textToInsert);
+        });
+
+        // Set new cursor position
+        const newPosition = new vscode.Position(position.line + 1, indentation.length + 2); // After '• '
+        editor.selection = new vscode.Selection(newPosition, newPosition);
     }
 
     private static findBlockRangeInTree(blockNode: BlockNode): { start: number, end: number } {
