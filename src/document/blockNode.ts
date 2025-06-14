@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { determineBulletType } from '../utils/bulletPointUtils';
 
 export interface KeyValueProperty {
     key: string;
@@ -59,7 +60,7 @@ export class BlockNode {
 
         // If bulletType and bulletRange are not explicitly provided, determine them
         if (bulletType === 'none' || bulletRange === undefined) {
-            const determinedBullet = this.determineBulletType(this.text, this.indent, this.isCodeBlockDelimiter, this.isExcluded, this.lineNumber);
+            const determinedBullet = determineBulletType(this.text, this.indent, this.isCodeBlockDelimiter, this.isExcluded, this.lineNumber);
             this.bulletType = determinedBullet.bulletType;
             this.bulletRange = determinedBullet.bulletRange;
         } else {
@@ -139,42 +140,6 @@ export class BlockNode {
      * @param lineNumber The line number.
      * @returns An object containing the bulletType and its vscode.Range, or 'none' and undefined range.
      */
-    private determineBulletType(
-        lineText: string,
-        indent: number,
-        isCodeBlockDelimiter: boolean,
-        isExcluded: boolean,
-        lineNumber: number
-    ): { bulletType: 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'default' | 'none' | 'atSign'; bulletRange?: vscode.Range } {
-        if (isCodeBlockDelimiter || isExcluded) {
-            return { bulletType: 'none' };
-        }
-
-        const textAfterIndent = lineText.substring(indent);
-
-        // Regex for common bullet types and their ranges
-        const bulletPatterns = [
-            { type: 'atSign', regex: /^(@)/, bulletChar: '@' }, // New: Matches '@' at the start
-            { type: 'star', regex: /^(\*\s)/, bulletChar: '*' },
-            { type: 'plus', regex: /^(\+\s)/, bulletChar: '+' },
-            { type: 'minus', regex: /^(-\s)/, bulletChar: '-' }, // Ensure space is captured
-            { type: 'default', regex: /^(\u2022\s)/, bulletChar: '•' }, // Ensure space is captured
-            { type: 'numbered', regex: /^(\d+[\.\)]\s)/, bulletChar: '1.' }, // Example bulletChar
-            { type: 'blockquote', regex: /^(>\s)/, bulletChar: '>' }
-        ];
-
-        for (const pattern of bulletPatterns) {
-            const match = textAfterIndent.match(pattern.regex);
-            if (match) {
-                const bulletStart = indent;
-                const bulletEnd = indent + match[1].length;
-                const bulletRange = new vscode.Range(lineNumber, bulletStart, lineNumber, bulletEnd);
-                return { bulletType: pattern.type as any, bulletRange };
-            }
-        }
-
-        return { bulletType: 'none' };
-    }
 
     /**
      * Creates a new BlockNode with updated children.

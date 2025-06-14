@@ -69,6 +69,12 @@
         "command": "pointblank.tab",
         "key": "tab",
         "when": "editorTextFocus && pointblank.lineHasBullet"
+      },
+      {
+        "command": "pointblank.pasteWithBullets",
+        "key": "ctrl+v",
+        "mac": "cmd+v",
+        "when": "editorTextFocus && editorLangId == 'markdown' && editorHasSelection == false"
       }
     ],
     "configuration": {

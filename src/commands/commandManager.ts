@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { ExtensionState } from '../state/extensionState';
 import { DocumentModel } from '../document/documentModel';
 import { BlockNode } from '../document/blockNode';
+import { PasteWithBullets } from './pasteWithBullets';
 
 export class CommandManager {
     private extensionState: ExtensionState;
@@ -158,7 +159,8 @@ if (blockNode && blockNode.bulletRange) {
             }),
             vscode.commands.registerTextEditorCommand('pointblank.outdent', () => {
                 vscode.commands.executeCommand('outdentLines');
-            })
+            }),
+            vscode.commands.registerTextEditorCommand('pointblank.pasteWithBullets', PasteWithBullets.pasteWithBulletsCommand)
         );
     }
 }
