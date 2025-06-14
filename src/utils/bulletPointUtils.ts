@@ -25,20 +25,20 @@ export function determineBulletType(
 
     // Regex for common bullet types and their ranges
     const bulletPatterns = [
-        { type: 'atSign', regex: /^(@)/, bulletChar: '@' },
-        { type: 'star', regex: /^(\*\s)/, bulletChar: '*' },
-        { type: 'plus', regex: /^(\+\s)/, bulletChar: '+' },
-        { type: 'minus', regex: /^(-\s)/, bulletChar: '-' },
-        { type: 'default', regex: /^(\u2022\s)/, bulletChar: '•' },
-        { type: 'numbered', regex: /^(\d+[\.\)]\s)/, bulletChar: '1.' },
-        { type: 'blockquote', regex: /^(>\s)/, bulletChar: '>' }
+        { type: 'atSign', regex: /^(@)\s*/, bulletChar: '@' },
+        { type: 'star', regex: /^(\*)\s*/, bulletChar: '*' },
+        { type: 'plus', regex: /^(\+)\s*/, bulletChar: '+' },
+        { type: 'minus', regex: /^(-)\s*/, bulletChar: '-' },
+        { type: 'default', regex: /^(\u2022)\s*/, bulletChar: '•' },
+        { type: 'numbered', regex: /^(\d+[\.\)])\s*/, bulletChar: '1.' },
+        { type: 'blockquote', regex: /^(>)\s*/, bulletChar: '>' }
     ];
 
     for (const pattern of bulletPatterns) {
         const match = textAfterIndent.match(pattern.regex);
         if (match) {
             const bulletStart = indent;
-            const bulletEnd = indent + match[1].length;
+            const bulletEnd = indent + match[0].length; // Use match[0].length to include any matched whitespace
             const bulletRange = new vscode.Range(lineNumber, bulletStart, lineNumber, bulletEnd);
             return { bulletType: pattern.type as any, bulletRange };
         }

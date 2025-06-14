@@ -9,66 +9,103 @@ export class PasteWithBullets {
         }
 
         const document = editor.document;
-        const position = editor.selection.active;
-        const lineAtCursor = document.lineAt(position.line);
-        const textAfterCursor = lineAtCursor.text.substring(position.character);
-        const currentLineIndentation = lineAtCursor.firstNonWhitespaceCharacterIndex;
+        const selection = editor.selection;
+        const originalCursorCharacter = selection.start.character;
+        const currentLine = document.lineAt(selection.start.line);
+        const currentLineIndentation = currentLine.firstNonWhitespaceCharacterIndex;
+        const { bulletType: currentLineBulletType, bulletRange: currentLineBulletRange } = determineBulletType(currentLine.text, currentLineIndentation, false, false, currentLine.lineNumber);
 
         const clipboardText = await vscode.env.clipboard.readText();
         const lines = clipboardText.split(/\r?\n/);
 
-        const processedLines: string[] = [];
+        const isPastingAtLineStart = originalCursorCharacter <= currentLineIndentation;
 
-        for (let i = 0; i < lines.length; i++) {
-            let line = lines[i];
-            const trimmedLine = line.trim();
-            const lineOriginalIndent = line.match(/^\s*/)?.[0].length || 0;
+        const clipboardProcessedLines: string[] = [];
 
-            if (trimmedLine.length === 0) {
-                processedLines.push(''); // Keep empty lines as they are
+        if (lines.length > 0) {
+            let firstClipboardLineContent = lines[0];
+            const firstClipboardLineOriginalIndent = firstClipboardLineContent.match(/^\s*/)?.[0].length || 0;
+            const firstClipboardLineTrimmedContent = firstClipboardLineContent.trim();
+            const { bulletType: firstClipboardLineBulletType, bulletRange: firstClipboardLineBulletRange } = determineBulletType(firstClipboardLineContent, firstClipboardLineOriginalIndent, false, false, 0);
+
+            if (isPastingAtLineStart) {
+                // Scenario A: Pasting at the start of the line (replace entire line)
+                let finalFirstLineContent: string;
+                if (firstClipboardLineBulletType === 'none') {
+                    finalFirstLineContent = `• ${firstClipboardLineTrimmedContent}`;
+                } else {
+                    // Preserve existing bullet from clipboard
+                    finalFirstLineContent = firstClipboardLineContent.trim();
+                }
+                clipboardProcessedLines.push(' '.repeat(currentLineIndentation) + finalFirstLineContent);
+
+            } else {
+                // Scenario B: Pasting mid-line (insert text, remove bullet from pasted content)
+                let textToInsertFromClipboard = firstClipboardLineContent;
+                if (firstClipboardLineBulletType !== 'none' && firstClipboardLineBulletRange) {
+                    // Remove the bullet from the pasted content
+                    textToInsertFromClipboard = firstClipboardLineContent.substring(firstClipboardLineBulletRange.end.character).trimStart();
+                } else {
+                    textToInsertFromClipboard = firstClipboardLineContent.trimStart();
+                }
+                
+                // The first line of the processed output will be the modified current line
+                // This line will be constructed by combining parts of the current line with the processed clipboard content
+                const partBeforeCursor = currentLine.text.substring(0, originalCursorCharacter);
+                const partAfterCursor = currentLine.text.substring(originalCursorCharacter);
+                clipboardProcessedLines.push(partBeforeCursor + textToInsertFromClipboard + partAfterCursor);
+            }
+        }
+
+        // Process subsequent lines (only if multi-line paste)
+        for (let i = 1; i < lines.length; i++) {
+            let lineContent = lines[i];
+            const lineOriginalIndent = lineContent.match(/^\s*/)?.[0].length || 0;
+            const trimmedLineContent = lineContent.trim();
+
+            if (trimmedLineContent.length === 0) {
+                clipboardProcessedLines.push(''); // Keep empty lines as they are
                 continue;
             }
 
-            // Check if the line already has a bullet point, using its actual indentation
-            const { bulletType } = determineBulletType(line, lineOriginalIndent, false, false, 0); // lineNumber is not relevant for this check
+            const { bulletType } = determineBulletType(lineContent, lineOriginalIndent, false, false, 0);
 
+            let finalLine = lineContent;
             if (bulletType === 'none') {
-                // Prepend default bullet point if no bullet exists
-                line = `• ${line}`;
+                finalLine = `• ${trimmedLineContent}`;
             }
-
-            // Handle indentation
-            if (i === 0) {
-                // First line gets relative indentation based on cursor's current line
-                const firstLineProcessedIndent = line.match(/^\s*/)?.[0].length || 0;
-                const relativeIndent = currentLineIndentation + firstLineProcessedIndent;
-                processedLines.push(' '.repeat(relativeIndent) + line.trimStart());
-            } else {
-                // Subsequent lines keep their absolute indentation from the clipboard
-                processedLines.push(line);
-            }
+            
+            // Subsequent lines keep their absolute indentation from the clipboard
+            clipboardProcessedLines.push(' '.repeat(lineOriginalIndent) + finalLine.trimStart());
         }
 
-        // Append the text that was originally after the cursor to the last processed line
-        if (processedLines.length > 0) {
-            processedLines[processedLines.length - 1] += textAfterCursor;
-        } else {
-            // If clipboard was empty, just insert the original text after cursor
-            processedLines.push(textAfterCursor);
-        }
-
-        const textToInsert = processedLines.join('\n');
+        const textToInsert = clipboardProcessedLines.join('\n');
 
         await editor.edit(editBuilder => {
-            // Delete text after cursor on current line before inserting
-            const rangeToDelete = new vscode.Range(position, lineAtCursor.range.end);
-            editBuilder.delete(rangeToDelete);
-            editBuilder.insert(position, textToInsert);
+            if (isPastingAtLineStart) {
+                // Replace the entire current line content
+                const rangeToReplace = new vscode.Range(selection.start.line, 0, selection.start.line, currentLine.text.length);
+                editBuilder.replace(rangeToReplace, textToInsert);
+            } else {
+                // Replace the selection (which is a collapsed range for insertion)
+                editBuilder.replace(selection, textToInsert);
+            }
         });
 
         // Set new cursor position at the end of the pasted content
-        const newPositionLine = position.line + processedLines.length - 1;
-        const newPositionCharacter = processedLines[processedLines.length - 1].length;
+        const newPositionLine = selection.start.line + clipboardProcessedLines.length - 1;
+        let newPositionCharacter: number;
+
+        if (clipboardProcessedLines.length === 1) {
+            if (isPastingAtLineStart) {
+                newPositionCharacter = clipboardProcessedLines[0].length;
+            } else {
+                newPositionCharacter = originalCursorCharacter + (clipboardProcessedLines[0].length - currentLine.text.length);
+            }
+        } else {
+            newPositionCharacter = clipboardProcessedLines[clipboardProcessedLines.length - 1].length;
+        }
+        
         editor.selection = new vscode.Selection(newPositionLine, newPositionCharacter, newPositionLine, newPositionCharacter);
     }
 }
