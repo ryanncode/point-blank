@@ -11,19 +11,19 @@ import { BlockNode } from './blockNode'; // Import BlockNode
  */
 export class DocumentModel {
     private _document: vscode.TextDocument;
-    private _documentTree: DocumentTree;
+    private _documentTree: DocumentTree = DocumentTree.create(null as any, []); // Initialize with a dummy tree
     private _parser: DocumentParser;
     private _decorationManager?: DecorationManager;
     private _disposables: vscode.Disposable[] = [];
-    private _isParsing: boolean = false; // New flag to indicate if a parse is in progress
-    private _onDidParse: vscode.EventEmitter<void> = new vscode.EventEmitter<void>(); // New event emitter
+    private _isParsing: boolean = false; // New flag to indicate parsing in progress
+    private _onDidParseEventEmitter = new vscode.EventEmitter<void>(); // New event emitter
 
     constructor(document: vscode.TextDocument) {
         this._document = document;
         this._parser = new DocumentParser();
 
         // Perform an initial full parse of the document upon creation.
-        this._documentTree = this._parser.fullParse(this._document);
+        this.performFullParse(this._document);
 
         // Listen for document changes to trigger incremental parsing.
         const disposable = vscode.workspace.onDidChangeTextDocument(this.handleDocumentChange, this);
@@ -40,12 +40,12 @@ export class DocumentModel {
         return this._documentTree;
     }
 
-    public get isParsing(): boolean {
+    public get isParsing(): boolean { // New getter for parsing status
         return this._isParsing;
     }
 
-    public get onDidParse(): vscode.Event<void> {
-        return this._onDidParse.event;
+    public get onDidParse(): vscode.Event<void> { // New event for parsing completion
+        return this._onDidParseEventEmitter.event;
     }
 
     /**
@@ -73,22 +73,23 @@ export class DocumentModel {
      * and notifies the `DecorationManager`.
      */
     private handleDocumentChange(event: vscode.TextDocumentChangeEvent): void {
-        if (event.document !== this._document || !this._decorationManager) {
+        if (event.document.uri.toString() !== this._document.uri.toString() || !this._decorationManager) {
             return;
         }
 
-        this._isParsing = true; // Set parsing flag to true
+        // Update the internal document reference to the latest version
+        this._document = event.document;
 
+        this._isParsing = true; // Set parsing flag
         // Create a new, updated tree by applying the changes to the previous tree.
         const newDocumentTree = this._parser.parse(this._documentTree, event.contentChanges);
         this._documentTree = newDocumentTree;
+        this._isParsing = false; // Clear parsing flag
+        this._onDidParseEventEmitter.fire(); // Fire event
 
         // Notify the DecorationManager with the new tree. The manager will then
         // handle the debounced update of the actual decorations in the editor.
         this._decorationManager.updateDecorations(this._documentTree);
-
-        this._isParsing = false; // Set parsing flag to false
-        this._onDidParse.fire(); // Fire the event
     }
 
     /**
@@ -98,6 +99,32 @@ export class DocumentModel {
         this._disposables.forEach(d => d.dispose());
         this._disposables = [];
         this._decorationManager = undefined;
-        this._onDidParse.dispose(); // Dispose the event emitter
+        this._onDidParseEventEmitter.dispose(); // Dispose event emitter
+    }
+
+    /**
+     * Forces a full re-parse of the document and updates the DocumentTree.
+     * This is used for programmatic edits where the onDidChangeTextDocument event
+     * might not have processed the changes synchronously.
+     * @param document The latest TextDocument instance after programmatic edits.
+     */
+    public updateAfterProgrammaticEdit(document: vscode.TextDocument): void {
+        this.performFullParse(document);
+    }
+
+    /**
+     * Performs a full parse and updates the document tree, setting and clearing the parsing flag.
+     * @param document The TextDocument to parse.
+     */
+    private performFullParse(document: vscode.TextDocument): void {
+        this._document = document; // Update the internal document reference
+        this._isParsing = true; // Set parsing flag
+        this._documentTree = this._parser.fullParse(this._document);
+        this._isParsing = false; // Clear parsing flag
+        this._onDidParseEventEmitter.fire(); // Fire event
+
+        if (this._decorationManager) {
+            this._decorationManager.updateDecorations(this._documentTree);
+        }
     }
 }

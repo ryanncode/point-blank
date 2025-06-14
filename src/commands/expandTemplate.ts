@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { TemplateService } from '../templates/templateService';
 import { DocumentModel } from '../document/documentModel';
+import { ExtensionState } from '../state/extensionState';
 
 /**
  * Expands a template based on a type name (e.g., "Book") triggered by "@TypeName ".
@@ -68,7 +69,9 @@ export async function expandTemplateCommand(typeName: string, _documentModel: Do
     const newCursorPosition = new vscode.Position(line.lineNumber, newTitleLineContent.length);
     editor.selection = new vscode.Selection(newCursorPosition, newCursorPosition);
 
-    // Note: No explicit re-parse is needed here. The `editor.edit` operation triggers
-    // the `onDidChangeTextDocument` event, which the `DocumentModel` listens to.
-    // The `DocumentModel` then handles the re-parsing and decoration updates automatically.
+    // Crucially, force the document model to update after the programmatic edit.
+    // This ensures that subsequent commands (like Enter key handling) operate on an up-to-date tree.
+    // Add a small delay to allow VS Code's internal document model to fully synchronize.
+    await new Promise(resolve => setTimeout(resolve, 100));
+    _documentModel.updateAfterProgrammaticEdit(editor.document);
 }

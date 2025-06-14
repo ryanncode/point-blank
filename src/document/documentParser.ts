@@ -34,17 +34,24 @@ export class DocumentParser {
             return previousTree;
         }
 
-        // For simplicity and robustness, this implementation currently re-parses from the first
-        // changed line to the end of the document. A more complex implementation could
-        // analyze the changes to re-parse a smaller range.
         const document = previousTree.document;
+        // Determine the range of lines that need to be re-parsed.
+        // This is from the first changed line to the end of the document.
         const firstChangedLine = changes.reduce((min, change) => Math.min(min, change.range.start.line), document.lineCount);
 
-        const oldNodes = previousTree.getAllNodesFlat();
-        const newNodes = oldNodes.filter(node => node.lineNumber < firstChangedLine);
-        newNodes.push(...this.createFlatNodeList(document, firstChangedLine));
+        // Get all nodes from the previous tree that are *before* the first changed line.
+        const oldNodesBeforeChange = previousTree.getAllNodesFlat().filter(node => node.lineNumber < firstChangedLine);
 
-        const rootNodes = this.buildTreeFromFlatList(newNodes);
+        // Create new flat nodes for the changed and subsequent lines.
+        const newlyParsedNodes = this.createFlatNodeList(document, firstChangedLine);
+
+        // Combine the unchanged old nodes with the newly parsed nodes.
+        const allNodes = [...oldNodesBeforeChange, ...newlyParsedNodes];
+
+        // Rebuild the entire tree from the combined flat list.
+        // This ensures that all parent-child relationships are correctly re-established,
+        // even for newly created nodes or structural changes.
+        const rootNodes = this.buildTreeFromFlatList(allNodes);
         return DocumentTree.create(document, rootNodes);
     }
 

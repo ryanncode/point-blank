@@ -33,6 +33,7 @@ export class EnterKeyHandler {
         }
 
 
+
         // If a parse is currently in progress, wait for it to complete to ensure we operate on the latest document tree.
         if (documentModel.isParsing) {
             await new Promise<void>(resolve => {
@@ -42,6 +43,8 @@ export class EnterKeyHandler {
                 });
             });
         }
+
+        // If a parse is currently in progress, wait for it to complete to ensure we operate on the latest document tree.
 
         const currentLine = document.lineAt(position.line);
         const currentBlockNode = documentModel.documentTree.getNodeAtLine(position.line);
