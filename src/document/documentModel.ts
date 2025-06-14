@@ -15,6 +15,8 @@ export class DocumentModel {
     private _parser: DocumentParser;
     private _decorationManager?: DecorationManager;
     private _disposables: vscode.Disposable[] = [];
+    private _isParsing: boolean = false; // New flag to indicate if a parse is in progress
+    private _onDidParse: vscode.EventEmitter<void> = new vscode.EventEmitter<void>(); // New event emitter
 
     constructor(document: vscode.TextDocument) {
         this._document = document;
@@ -36,6 +38,14 @@ export class DocumentModel {
 
     public get documentTree(): DocumentTree {
         return this._documentTree;
+    }
+
+    public get isParsing(): boolean {
+        return this._isParsing;
+    }
+
+    public get onDidParse(): vscode.Event<void> {
+        return this._onDidParse.event;
     }
 
     /**
@@ -67,6 +77,8 @@ export class DocumentModel {
             return;
         }
 
+        this._isParsing = true; // Set parsing flag to true
+
         // Create a new, updated tree by applying the changes to the previous tree.
         const newDocumentTree = this._parser.parse(this._documentTree, event.contentChanges);
         this._documentTree = newDocumentTree;
@@ -74,6 +86,9 @@ export class DocumentModel {
         // Notify the DecorationManager with the new tree. The manager will then
         // handle the debounced update of the actual decorations in the editor.
         this._decorationManager.updateDecorations(this._documentTree);
+
+        this._isParsing = false; // Set parsing flag to false
+        this._onDidParse.fire(); // Fire the event
     }
 
     /**
@@ -83,5 +98,6 @@ export class DocumentModel {
         this._disposables.forEach(d => d.dispose());
         this._disposables = [];
         this._decorationManager = undefined;
+        this._onDidParse.dispose(); // Dispose the event emitter
     }
 }

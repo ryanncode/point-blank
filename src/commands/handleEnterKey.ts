@@ -33,6 +33,16 @@ export class EnterKeyHandler {
         }
 
 
+        // If a parse is currently in progress, wait for it to complete to ensure we operate on the latest document tree.
+        if (documentModel.isParsing) {
+            await new Promise<void>(resolve => {
+                const disposable = documentModel.onDidParse(() => {
+                    disposable.dispose();
+                    resolve();
+                });
+            });
+        }
+
         const currentLine = document.lineAt(position.line);
         const currentBlockNode = documentModel.documentTree.getNodeAtLine(position.line);
 
@@ -104,23 +114,24 @@ export class EnterKeyHandler {
         }
 
         // Case 2: Cursor is on a property line of the typed node.
+        // Case 2: Cursor is on a property line of the typed node.
         const currentChildIndex = typedNodeChildren.findIndex((child: BlockNode) => child.lineNumber === currentBlockNode.lineNumber);
         if (currentChildIndex !== -1) {
-                const trimmedLineEnd = currentBlockNode.line.text.trimEnd().length;
-                if (position.character >= trimmedLineEnd) {
-                    // Navigation logic
-                    if (currentChildIndex < typedNodeChildren.length - 1) {
-                        this.moveCursorToNodeValue(editor, typedNodeChildren[currentChildIndex + 1]);
-                    } else {
-                        const indent = document.lineAt(typedNodeTitleLine).firstNonWhitespaceCharacterIndex;
-                        const insertLineNum = this.findBlockRangeInTree(typedNodeParent).end + 1;
-                        await this.insertNewLineAndPositionCursor(editor, insertLineNum, indent);
-                    }
+            const trimmedLineEnd = currentBlockNode.line.text.trimEnd().length;
+            if (position.character >= trimmedLineEnd) {
+                // Navigation logic
+                if (currentChildIndex < typedNodeChildren.length - 1) {
+                    this.moveCursorToNodeValue(editor, typedNodeChildren[currentChildIndex + 1]);
                 } else {
-                    // Line splitting logic
-                    await this.splitPropertyLine(editor, position, document);
+                    const indent = document.lineAt(typedNodeTitleLine).firstNonWhitespaceCharacterIndex;
+                    const insertLineNum = this.findBlockRangeInTree(typedNodeParent).end + 1;
+                    await this.insertNewLineAndPositionCursor(editor, insertLineNum, indent);
                 }
-                return true; // Always return true if handled within a typed node property line
+            } else {
+                // Line splitting logic
+                await this.splitPropertyLine(editor, position, document);
+            }
+            return true; // Always return true if handled within a typed node property line
         }
         return false;
     }
