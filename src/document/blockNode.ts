@@ -109,6 +109,24 @@ export class BlockNode {
     }
 
     /**
+     * Recursively finds a BlockNode within the tree (or subtree) by its line number.
+     * @param lineNumber The line number of the BlockNode to find.
+     * @returns The BlockNode if found, otherwise undefined.
+     */
+    public findNodeAtLine(lineNumber: number): BlockNode | undefined {
+        if (this.lineNumber === lineNumber) {
+            return this;
+        }
+        for (const child of this.children) {
+            const found = child.findNodeAtLine(lineNumber);
+            if (found) {
+                return found;
+            }
+        }
+        return undefined;
+    }
+
+    /**
      * Creates a new `BlockNode` instance with updated children.
      * This method is essential for maintaining the immutability of the document tree.
      * @param newChildren The new array of child nodes.

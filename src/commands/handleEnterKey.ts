@@ -32,13 +32,23 @@ export class EnterKeyHandler {
             return;
         }
 
+        const currentLine = document.lineAt(position.line);
         const currentBlockNode = documentModel.documentTree.getNodeAtLine(position.line);
+
+        // If for some reason the current line is not found in the parsed tree,
+        // fall back to default newline behavior. This should ideally not happen.
+        if (!currentBlockNode) {
+            await vscode.commands.executeCommand('type', { text: '\n' });
+            return;
+        }
 
         // --- Context-Specific Enter Key Logic ---
 
         // 1. Typed Node Navigation: If inside a typed node (e.g., `(Book)`), navigate between properties.
-        if (currentBlockNode && await this.handleTypedNodeNavigation(editor, currentBlockNode)) {
-            return;
+        // This method will return true ONLY if it successfully navigates from an empty property value or title line.
+        // If it's a non-empty property value, it will return false.
+        if (currentBlockNode && await this.handleTypedNodeNavigation(editor, currentBlockNode, position)) {
+            return; // Handled by typed node navigation (all cases within a typed node)
         }
 
         // 2. Folded Block Handling: If on the title line of a folded block, create a new line after the block.
@@ -56,8 +66,7 @@ export class EnterKeyHandler {
 
         // 4. Default Behavior with Smart Splitting: If none of the above, split the line,
         // creating a new bullet point for the text that was after the cursor.
-        const line = document.lineAt(position.line);
-        const textAfterCursor = line.text.substring(position.character);
+        const textAfterCursor = currentLine.text.substring(position.character);
 
         if (textAfterCursor.length > 0) {
             await this.insertBulletPointAndMoveText(editor, position, document);
@@ -72,7 +81,7 @@ export class EnterKeyHandler {
      * It navigates to the next property or exits the block.
      * @returns `true` if the key press was handled, `false` otherwise.
      */
-    private async handleTypedNodeNavigation(editor: vscode.TextEditor, currentBlockNode: BlockNode): Promise<boolean> {
+    private async handleTypedNodeNavigation(editor: vscode.TextEditor, currentBlockNode: BlockNode, position: vscode.Position): Promise<boolean> {
         const typedNodeParent = findTypedNodeParent(currentBlockNode);
         if (!typedNodeParent) return false;
 
@@ -96,24 +105,28 @@ export class EnterKeyHandler {
         // Case 2: Cursor is on a property line of the typed node.
         const currentChildIndex = typedNodeChildren.findIndex((child: BlockNode) => child.lineNumber === currentBlockNode.lineNumber);
         if (currentChildIndex !== -1) {
-            // Check if the cursor is at the end of the line (or if the line is empty after the key part)
-            const line = document.lineAt(currentBlockNode.lineNumber);
-            const isAtEndOfLine = editor.selection.active.character === line.text.length;
-
-            if (isAtEndOfLine) {
-                if (currentChildIndex < typedNodeChildren.length - 1) {
-                    // Move to the value of the next property.
-                    this.moveCursorToNodeValue(editor, typedNodeChildren[currentChildIndex + 1]);
+            if (currentBlockNode.isKeyValue) {
+                // If it's a key-value pair
+                if (currentBlockNode.keyValue && (currentBlockNode.keyValue.value.trim().length === 0 || position.character >= currentBlockNode.line.range.end.character)) {
+                    // Navigation logic: empty value or cursor at the end of the line
+                    if (currentChildIndex < typedNodeChildren.length - 1) {
+                        this.moveCursorToNodeValue(editor, typedNodeChildren[currentChildIndex + 1]);
+                    } else {
+                        const indent = document.lineAt(typedNodeTitleLine).firstNonWhitespaceCharacterIndex;
+                        const insertLineNum = this.findBlockRangeInTree(typedNodeParent).end + 1;
+                        await this.insertNewLineAndPositionCursor(editor, insertLineNum, indent);
+                    }
                 } else {
-                    // Last property: create a new line after the entire block.
-                    const indent = document.lineAt(typedNodeTitleLine).firstNonWhitespaceCharacterIndex;
-                    const insertLineNum = this.findBlockRangeInTree(typedNodeParent).end + 1;
-                    await this.insertNewLineAndPositionCursor(editor, insertLineNum, indent);
+                    // Line splitting logic: non-empty value and cursor in the middle
+                    await this.splitPropertyLine(editor, position, document);
                 }
-                return true;
+            } else {
+                // If it's not a key-value pair (e.g., a bullet point child of a typed node)
+                // Line splitting logic
+                await this.splitPropertyLine(editor, position, document);
             }
+            return true; // Always return true if handled within a typed node property line
         }
-
         return false;
     }
 
@@ -148,13 +161,13 @@ export class EnterKeyHandler {
      * and moving the text that was after the cursor to the new line.
      */
     private async insertBulletPointAndMoveText(editor: vscode.TextEditor, position: vscode.Position, document: vscode.TextDocument): Promise<void> {
-        const line = document.lineAt(position.line);
-        const textAfterCursor = line.text.substring(position.character);
-        const indentation = line.text.substring(0, line.firstNonWhitespaceCharacterIndex);
+        const currentLine = document.lineAt(position.line);
+        const textAfterCursor = currentLine.text.substring(position.character);
+        const indentation = currentLine.text.substring(0, currentLine.firstNonWhitespaceCharacterIndex);
 
         await editor.edit(editBuilder => {
             // Delete text after the cursor on the current line.
-            editBuilder.delete(new vscode.Range(position, line.range.end));
+            editBuilder.delete(new vscode.Range(position, currentLine.range.end));
             // Insert a new line with indentation, a bullet, and the moved text.
             editBuilder.insert(position, `\n${indentation}• ${textAfterCursor}`);
         });
@@ -164,6 +177,26 @@ export class EnterKeyHandler {
         editor.selection = new vscode.Selection(newPosition, newPosition);
     }
 
+    /**
+     * Splits the current line at the cursor, creating a new line without a bullet point
+     * and moving the text that was after the cursor to the new line.
+     */
+    private async splitPropertyLine(editor: vscode.TextEditor, position: vscode.Position, document: vscode.TextDocument): Promise<void> {
+        const currentLine = document.lineAt(position.line);
+        const textAfterCursor = currentLine.text.substring(position.character);
+        const indentation = currentLine.text.substring(0, currentLine.firstNonWhitespaceCharacterIndex);
+
+        await editor.edit(editBuilder => {
+            // Delete text after the cursor on the current line.
+            editBuilder.delete(new vscode.Range(position, currentLine.range.end));
+            // Insert a new line with indentation and the moved text.
+            editBuilder.insert(position, `\n${indentation}${textAfterCursor}`);
+        });
+
+        // Position the cursor at the start of the moved text on the new line.
+        const newPosition = new vscode.Position(position.line + 1, indentation.length);
+        editor.selection = new vscode.Selection(newPosition, newPosition);
+    }
 
     /**
      * Moves the cursor to the beginning of the value part of a key-value node,
