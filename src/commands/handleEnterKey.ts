@@ -162,9 +162,23 @@ export class EnterKeyHandler {
                 return;
             }
         }
-
-        // If not on a folded block's title line or block is not folded, execute default Enter key action
+ 
         const line = document.lineAt(position.line);
+ 
+        // New logic to handle Enter key after a bullet point
+        if (currentBlockNode && currentBlockNode.bulletRange && position.character === currentBlockNode.bulletRange.end.character) {
+            await editor.edit(editBuilder => {
+                editBuilder.insert(new vscode.Position(position.line, 0), '\n');
+            });
+ 
+            if (EnterKeyHandler.enabled) {
+                foldingLogicTimer.stop();
+                enterKeyTimer.stop();
+            }
+            return;
+        }
+ 
+        // If not on a folded block's title line or block is not folded, execute default Enter key action
         const textAfterCursor = line.text.substring(position.character);
 
         if (textAfterCursor.length > 0) {
