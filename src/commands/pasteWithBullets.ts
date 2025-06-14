@@ -82,14 +82,9 @@ export class PasteWithBullets {
         const textToInsert = clipboardProcessedLines.join('\n');
 
         await editor.edit(editBuilder => {
-            if (isPastingAtLineStart) {
-                // Replace the entire current line content
-                const rangeToReplace = new vscode.Range(selection.start.line, 0, selection.start.line, currentLine.text.length);
-                editBuilder.replace(rangeToReplace, textToInsert);
-            } else {
-                // Replace the selection (which is a collapsed range for insertion)
-                editBuilder.replace(selection, textToInsert);
-            }
+            // Always replace the entire current line content for the first line of the paste
+            const rangeToReplace = new vscode.Range(selection.start.line, 0, selection.start.line, currentLine.text.length);
+            editBuilder.replace(rangeToReplace, textToInsert);
         });
 
         // Set new cursor position at the end of the pasted content
