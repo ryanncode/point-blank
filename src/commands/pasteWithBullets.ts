@@ -41,6 +41,45 @@ export class PasteWithBullets {
             return;
         }
 
+        if (this._isTypedNodePaste(clipboardLines, currentLine.firstNonWhitespaceCharacterIndex)) {
+            const pasteStartCharacter = selection.start.character;
+
+            const adjustedClipboardLines: string[] = [];
+            if (clipboardLines.length > 0) {
+                const firstClipboardLine = clipboardLines[0];
+                const originalFirstLineIndent = firstClipboardLine.match(/^\s*/)?.[0].length || 0;
+
+                // The first line of the pasted content should simply be its trimmed content.
+                // Its indentation will be handled by the 'replace' operation at selection.start.character.
+                adjustedClipboardLines.push(firstClipboardLine.trimStart());
+
+                // For subsequent lines, calculate their relative indentation to the first line
+                // and apply it on top of the pasteStartCharacter.
+                for (let i = 1; i < clipboardLines.length; i++) {
+                    const line = clipboardLines[i];
+                    const originalLineIndent = line.match(/^\s*/)?.[0].length || 0;
+                    const contentWithoutOriginalIndent = line.substring(originalLineIndent);
+
+                    // Calculate the relative indent from the original first line of the clipboard content
+                    const relativeIndent = originalLineIndent - originalFirstLineIndent;
+
+                    // Calculate the new absolute indent for the current line
+                    const newAbsoluteIndent = pasteStartCharacter + relativeIndent;
+
+                    adjustedClipboardLines.push(' '.repeat(newAbsoluteIndent) + contentWithoutOriginalIndent);
+                }
+            }
+
+            const textToInsert = adjustedClipboardLines.join('\n');
+
+            await editor.edit(editBuilder => {
+                editBuilder.replace(selection, textToInsert);
+            });
+
+            this.updateCursorPosition(editor, adjustedClipboardLines, currentLine, selection);
+            return;
+        }
+
         // Process the clipboard content line by line.
         const processedLines = this.processClipboardLines(clipboardLines, currentLine, currentBlockNode, selection);
         const textToInsert = processedLines.join('\n');
@@ -148,5 +187,43 @@ export class PasteWithBullets {
 
         const newPosition = new vscode.Position(newPositionLine, newPositionChar);
         editor.selection = new vscode.Selection(newPosition, newPosition);
+    }
+
+    /**
+     * Determines if the clipboard content represents a full typed node paste.
+     * A typed node paste is identified by:
+     * 1. The first line starting with `(TypeName)`.
+     * 2. Subsequent lines (if any) being indented relative to the first line.
+     * @param clipboardLines The array of lines read from the clipboard.
+     * @param currentLineIndentation The indentation level of the line where pasting is initiated.
+     * @returns True if the content is a typed node paste, false otherwise.
+     */
+    private _isTypedNodePaste(clipboardLines: string[], currentLineIndentation: number): boolean {
+        if (clipboardLines.length === 0) {
+            return false;
+        }
+
+        const firstLine = clipboardLines[0].trim();
+        // Check if the first line starts with (TypeName)
+        const typedNodeRegex = /^\(\w+\)/;
+        if (!typedNodeRegex.test(firstLine)) {
+            return false;
+        }
+
+        // For multi-line pastes, check if subsequent lines are indented.
+        if (clipboardLines.length > 1) {
+            const firstLineIndent = clipboardLines[0].match(/^\s*/)?.[0].length || 0;
+            for (let i = 1; i < clipboardLines.length; i++) {
+                const line = clipboardLines[i];
+                const lineIndent = line.match(/^\s*/)?.[0].length || 0;
+                // Subsequent lines of a typed node should be indented more than the first line.
+                // Or, if they are empty, they should at least maintain the first line's indentation.
+                if (line.trim().length > 0 && lineIndent <= firstLineIndent) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 }
