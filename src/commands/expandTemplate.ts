@@ -35,32 +35,35 @@ export async function expandTemplateCommand(typeName: string, _documentModel: Do
 
     let newTitleLineContent: string = '';
 
+    // --- 1. Delete the Trigger Text ---
+    // Find the '@' symbol to determine the start of the trigger text.
+    const atSymbolIndex = line.text.indexOf('@', line.firstNonWhitespaceCharacterIndex);
+    if (atSymbolIndex === -1) {
+        // This should not happen if the command is triggered correctly by the InlineCompletionProvider.
+        return;
+    }
+
+    // The range to delete includes everything from the '@' to the cursor (which is after the space).
+    const deleteRange = new vscode.Range(line.lineNumber, atSymbolIndex, line.lineNumber, position.character);
     await editor.edit(editBuilder => {
-        // --- 1. Delete the Trigger Text ---
-        // Find the '@' symbol to determine the start of the trigger text.
-        const atSymbolIndex = line.text.indexOf('@', line.firstNonWhitespaceCharacterIndex);
-        if (atSymbolIndex === -1) {
-            // This should not happen if the command is triggered correctly by the InlineCompletionProvider.
-            return;
-        }
-
-        // The range to delete includes everything from the '@' to the cursor (which is after the space).
-        const deleteRange = new vscode.Range(line.lineNumber, atSymbolIndex, line.lineNumber, position.character);
         editBuilder.delete(deleteRange);
+    });
 
-        // --- 2. Prepare and Insert New Content ---
-        const currentIndent = line.text.substring(0, line.firstNonWhitespaceCharacterIndex);
-        const propertyIndent = ' '.repeat(tabSize); // Use user's tab size for property indentation
+    // --- 2. Prepare and Insert New Content ---
+    const currentIndent = line.text.substring(0, line.firstNonWhitespaceCharacterIndex);
+    const propertyIndent = ' '.repeat(tabSize); // Use user's tab size for property indentation
 
-        // Create the new title line, e.g., "  (Book) "
-        newTitleLineContent = `${currentIndent}(${typeName}) `;
+    // Create the new title line, e.g., "  (Book) "
+    newTitleLineContent = `${currentIndent}(${typeName}) `;
+
+    // Format and insert the template properties, indented under the title line.
+    const templateLines = templateContent.split('\n').filter(l => l.trim() !== '');
+    const propertiesText = templateLines
+        .map(prop => `\n${currentIndent}${propertyIndent}${prop}`) // Indent properties by user's tab size, no bullet.
+        .join('');
+
+    await editor.edit(editBuilder => {
         editBuilder.insert(line.range.start, newTitleLineContent);
-
-        // Format and insert the template properties, indented under the title line.
-        const templateLines = templateContent.split('\n').filter(l => l.trim() !== '');
-        const propertiesText = templateLines
-            .map(prop => `\n${currentIndent}${propertyIndent}${prop}`) // Indent properties by user's tab size, no bullet.
-            .join('');
         editBuilder.insert(line.range.end, propertiesText);
     });
 

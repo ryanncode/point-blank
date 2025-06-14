@@ -44,10 +44,30 @@ export class EnterKeyHandler {
             });
         }
 
-        // If a parse is currently in progress, wait for it to complete to ensure we operate on the latest document tree.
-
+        let currentBlockNode = documentModel.documentTree.getNodeAtLine(position.line);
         const currentLine = document.lineAt(position.line);
-        const currentBlockNode = documentModel.documentTree.getNodeAtLine(position.line);
+
+        // --- Just-in-Time Re-parse for Stale Tree after Template Insertion ---
+        // This addresses the edge case where the document model might be temporarily inconsistent
+        // immediately after a large programmatic edit (like template insertion).
+        // If we are on a line that looks like a key-value property but its typed node parent
+        // isn't correctly recognized, we force a full re-parse to get a fresh, accurate tree.
+        const isKeyValueLike = currentLine.text.includes('::');
+        if (isKeyValueLike && currentBlockNode && !findTypedNodeParent(currentBlockNode)) {
+            // Force a full re-parse of the document.
+            // We pass the current document instance to ensure the parser works with the latest text.
+            documentModel.updateAfterProgrammaticEdit(document);
+
+            // After the full parse, get the updated node from the new tree.
+            // We need to wait for the parse to complete before getting the node.
+            await new Promise<void>(resolve => {
+                const disposable = documentModel.onDidParse(() => {
+                    disposable.dispose();
+                    resolve();
+                });
+            });
+            currentBlockNode = documentModel.documentTree.getNodeAtLine(position.line);
+        }
 
         // If for some reason the current line is not found in the parsed tree,
         // fall back to default newline behavior. This should ideally not happen.

@@ -162,21 +162,42 @@ export class DocumentParser {
             newNodesMap.set(newNode.lineNumber, newNode);
         }
 
-        // Pass 3: Create final nodes with correct parent references and identify root nodes.
-        const finalRootNodes: BlockNode[] = [];
+        // Pass 3: Create final nodes with correct parent references.
+        // At this point, newNodesMap contains nodes with correct children, but their parents' children arrays
+        // might still point to older instances. This pass ensures each node has its correct parent.
         for (const oldNode of nodes) {
-            const newNode = newNodesMap.get(oldNode.lineNumber)!; // Get the node with correct children
-            let finalNode: BlockNode = newNode;
-
+            const nodeWithChildren = newNodesMap.get(oldNode.lineNumber)!;
             if (oldNode.parent) {
                 const newParent = newNodesMap.get(oldNode.parent.lineNumber);
                 if (newParent) {
-                    finalNode = newNode.withParent(newParent); // Create a new instance with the correct parent
-                    newNodesMap.set(finalNode.lineNumber, finalNode); // Update map with this final instance
+                    // Create a new instance with the correct parent reference
+                    const nodeWithCorrectParent = nodeWithChildren.withParent(newParent);
+                    newNodesMap.set(nodeWithCorrectParent.lineNumber, nodeWithCorrectParent);
                 }
             }
+        }
 
-            // Only add root nodes to the final list
+        // Pass 4: Final reconciliation to ensure parent.children arrays point to the correct, final instances.
+        // This is necessary because in Pass 2, children were set based on instances available then,
+        // but Pass 3 might have created new instances for parents.
+        const finalNodesMap = new Map<number, BlockNode>();
+        for (const node of nodes) {
+            const currentNode = newNodesMap.get(node.lineNumber)!;
+            const newChildren: BlockNode[] = [];
+            for (const child of currentNode.children) {
+                const finalChild = newNodesMap.get(child.lineNumber);
+                if (finalChild) {
+                    newChildren.push(finalChild);
+                }
+            }
+            const finalNode = currentNode.withChildren(newChildren);
+            finalNodesMap.set(finalNode.lineNumber, finalNode);
+        }
+
+        // Identify and return the root nodes from the fully reconciled map.
+        const finalRootNodes: BlockNode[] = [];
+        for (const node of nodes) {
+            const finalNode = finalNodesMap.get(node.lineNumber)!;
             if (!finalNode.parent) {
                 finalRootNodes.push(finalNode);
             }
