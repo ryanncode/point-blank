@@ -1,75 +1,52 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Point Blank - Architecture</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-    <header>
-        <h1>Point Blank Documentation</h1>
-        <nav>
-            <ul>
-                <li><a href="index.html">Home</a></li>
-                <li><a href="features.html">Features</a></li>
-                <li><a href="architecture.html">Architecture</a></li>
-                <li><a href="contributing.html">Contributing</a></li>
-            </ul>
-        </nav>
-    </header>
-    <main>
-        <section id="architecture-content">
-            <h2>Architecture Overview</h2>
-            <p>The extension's architecture is designed to be modular, performant, and maintainable, centered around an immutable document model that serves as the single source of truth.</p>
+---
+layout: default
+title: Architecture
+---
 
-            <h3>Data Flow:</h3>
-            <ol>
-                <li>When a document is opened or modified, VS Code fires an event that is picked up by the <code>DocumentModel</code>.</li>
-                <li>The <code>DocumentModel</code> uses the <code>DocumentParser</code> to create or update the <code>DocumentTree</code>, an immutable, hierarchical representation of the document's text.</li>
-                <li>The <code>DocumentModel</code> notifies the <code>DecorationManager</code> of the change.</li>
-                <li>The <code>DecorationManager</code>, using debouncing and viewport-aware logic, retrieves the visible <code>BlockNode</code>s from the <code>DocumentTree</code>.</li>
-                <li>It passes these nodes to the <code>DecorationCalculator</code>, which determines the appropriate decorations for each node based on its properties (e.g., <code>bulletType</code>).</li>
-                <li>The <code>DecorationManager</code> applies these decorations to the active editor, styling the existing text.</li>
-            </ol>
+<section id="architecture-content">
+    <h2>Architecture Overview</h2>
+    <p>The extension's architecture is designed to be modular, performant, and maintainable, centered around an immutable document model that serves as the single source of truth.</p>
 
-            <h2>Key Design Decisions</h2>
+    <h3>Data Flow:</h3>
+    <ol>
+        <li>When a document is opened or modified, VS Code fires an event that is picked up by the <code>DocumentModel</code>.</li>
+        <li>The <code>DocumentModel</code> uses the <code>DocumentParser</code> to create or update the <code>DocumentTree</code>, an immutable, hierarchical representation of the document's text.</li>
+        <li>The <code>DocumentModel</code> notifies the <code>DecorationManager</code> of the change.</li>
+        <li>The <code>DecorationManager</code>, using debouncing and viewport-aware logic, retrieves the visible <code>BlockNode</code>s from the <code>DocumentTree</code>.</li>
+        <li>It passes these nodes to the <code>DecorationCalculator</code>, which determines the appropriate decorations for each node based on its properties (e.g., <code>bulletType</code>).</li>
+        <li>The <code>DecorationManager</code> applies these decorations to the active editor, styling the existing text.</li>
+    </ol>
 
-            <h3>Immutable Document Model</h3>
-            <p>The use of an immutable <code>DocumentTree</code> and <code>BlockNode</code>s is a cornerstone of the architecture. When the document changes, a new tree is created rather than modifying the old one. This provides predictability, simplifies state management, and makes the flow of data easy to trace.</p>
+    <h2>Key Design Decisions</h2>
 
-            <h3>Design Philosophy: Insertion vs. Styling</h3>
-            <p>A critical distinction in Point Blank's architecture is the separation between one-time character <strong>insertion</strong> and continuous visual <strong>styling</strong>.</p>
-            <ul>
-                <li><strong>Insertion</strong>: For user convenience, some features will insert text directly into the document. For example, the <code>expandTemplate</code> command writes a new block of text, and the extension can be configured to add a bullet point on a new line.</li>
-                <li><strong>Styling</strong>: This is the core of the rendering engine. After a character has been inserted (or typed by the user), it is treated like any other character in the document. The decoration engine <strong>only styles what it sees</strong>; it does not use rendering tricks to display characters that aren't physically present in the file.</li>
-            </ul>
-            <p>This "real character" styling philosophy is the result of a major refactor to improve stability and interoperability. It provides key benefits:</p>
-            <ul>
-                <li><strong>Robustness & Interoperability</strong>: Because the document is always the single source of truth for rendering, it remains pure markdown. This prevents conflicts with other VS Code extensions and ensures the file is portable.</li>
-                <li><strong>No "Ghost" Characters</strong>: The previous architecture attempted to render visual-only characters, which led to conflicts with the document model and other editor features. The current approach eliminates this entire class of bugs.</li>
-            </ul>
+    <h3>Immutable Document Model</h3>
+    <p>The use of an immutable <code>DocumentTree</code> and <code>BlockNode</code>s is a cornerstone of the architecture. When the document changes, a new tree is created rather than modifying the old one. This provides predictability, simplifies state management, and makes the flow of data easy to trace.</p>
 
-            <h3>Separation of Concerns</h3>
-            <p>The architecture enforces a strong separation of concerns:</p>
-            <ul>
-                <li><strong>Parsing (<code>DocumentParser</code>):</strong> Solely responsible for converting text to a <code>DocumentTree</code>.</li>
-                <li><strong>State (<code>DocumentModel</code>, <code>ExtensionState</code>):</strong> Manages the state of the document and the extension.</li>
-                <li><strong>Rendering (<code>DecorationManager</code>):</strong> Manages the application of decorations to the editor.</li>
-                <li><strong>Logic (<code>DecorationCalculator</code>):</strong> Contains the stateless logic for determining which decorations to apply.</li>
-            </ul>
+    <h3>Design Philosophy: Insertion vs. Styling</h3>
+    <p>A critical distinction in Point Blank's architecture is the separation between one-time character <strong>insertion</strong> and continuous visual <strong>styling</strong>.</p>
+    <ul>
+        <li><strong>Insertion</strong>: For user convenience, some features will insert text directly into the document. For example, the <code>expandTemplate</code> command writes a new block of text, and the extension can be configured to add a bullet point on a new line.</li>
+        <li><strong>Styling</strong>: This is the core of the rendering engine. After a character has been inserted (or typed by the user), it is treated like any other character in the document. The decoration engine <strong>only styles what it sees</strong>; it does not use rendering tricks to display characters that aren't physically present in the file.</li>
+    </ul>
+    <p>This "real character" styling philosophy is the result of a major refactor to improve stability and interoperability. It provides key benefits:</p>
+    <ul>
+        <li><strong>Robustness & Interoperability</strong>: Because the document is always the single source of truth for rendering, it remains pure markdown. This prevents conflicts with other VS Code extensions and ensures the file is portable.</li>
+        <li><strong>No "Ghost" Characters</strong>: The previous architecture attempted to render visual-only characters, which led to conflicts with the document model and other editor features. The current approach eliminates this entire class of bugs.</li>
+    </ul>
 
-            <h3>Performant Decorations</h3>
-            <p>To ensure a smooth user experience, the decoration engine includes two key performance optimizations:</p>
-            <ul>
-                <li><strong>Debouncing:</strong> Decoration updates are debounced to prevent rapid, flickering updates while the user is typing.</li>
-                <li><strong>Viewport-Aware Rendering:</strong> The <code>DecorationManager</code> only processes the visible portion of the document (plus a small buffer), which significantly improves performance in large files.</li>
-            </ul>
-        </section>
-    </main>
-    <footer>
-        <p>&copy; 2025 Point Blank. All rights reserved.</p>
-    </footer>
-    <script src="main.js"></script>
-</body>
-</html>
+    <h3>Separation of Concerns</h3>
+    <p>The architecture enforces a strong separation of concerns:</p>
+    <ul>
+        <li><strong>Parsing (<code>DocumentParser</code>):</strong> Solely responsible for converting text to a <code>DocumentTree</code>.</li>
+        <li><strong>State (<code>DocumentModel</code>, <code>ExtensionState</code>):</strong> Manages the state of the document and the extension.</li>
+        <li><strong>Rendering (<code>DecorationManager</code>):</strong> Manages the application of decorations to the editor.</li>
+        <li><strong>Logic (<code>DecorationCalculator</code>):</strong> Contains the stateless logic for determining which decorations to apply.</li>
+    </ul>
+
+    <h3>Performant Decorations</h3>
+    <p>To ensure a smooth user experience, the decoration engine includes two key performance optimizations:</p>
+    <ul>
+        <li><strong>Debouncing:</strong> Decoration updates are debounced to prevent rapid, flickering updates while the user is typing.</li>
+        <li><strong>Viewport-Aware Rendering:</strong> The <code>DecorationManager</code> only processes the visible portion of the document (plus a small buffer), which significantly improves performance in large files.</li>
+    </ul>
+</section>

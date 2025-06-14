@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Features - Point Blank Documentation</title>
+    <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+    <header>
+        <h1>Point Blank Documentation</h1>
+        <nav>
+            <ul>
+                <li><a href="/index.html">Home</a></li>
+                <li><a href="/features.html">Features</a></li>
+                <li><a href="/architecture.html">Architecture</a></li>
+                <li><a href="/contributing.html">Contributing</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <section id="features-content">
+    <h2>Core Features</h2>
+
+    <h3>Intelligent Bullet Point Styling</h3>
+    <p>Point Blank enhances standard markdown lists by applying custom styling directly to the bullet characters (<code>*</code>, <code>+</code>, <code>-</code>, etc.). For convenience, the extension can be configured to automatically <strong>insert</strong> a default bullet point on a new line. However, once inserted, this character is treated just like any other text in the document. The rendering engine's job is only to <strong>style</strong> what is physically present in the file.</p>
+    <p>The following prefixes are recognized and styled:</p>
+    <ul>
+        <li><code>*</code> (asterisk)</li>
+        <li><code>+</code> (plus)</li>
+        <li><code>-</code> (minus)</li>
+        <li><code>1.</code>, <code>1)</code> (numbered lists)</li>
+        <li><code>></code> (blockquote)</li>
+        <li><code>@</code> (at-sign, for special mentions or commands)</li>
+    </ul>
+
+    <h3>Hierarchical Outlining & Folding</h3>
+    <p>The core of the outliner is its ability to create a hierarchy based on indentation. Users can create nested lists simply by indenting lines. The extension uses this structure to provide robust, indentation-based code folding, allowing users to collapse and expand sections of their outline to easily navigate large documents.</p>
+
+    <h3>Typed Nodes for Structured Data</h3>
+    <p>A key feature of Point Blank is the concept of "typed nodes." By writing a line like <code>(Book)</code>, users can create a structured data block. This block can contain key-value pairs (e.g., <code>Author:: John Doe</code>) that are visually distinguished and can be navigated with custom keybindings, streamlining data entry.</p>
+
+    <h3>Template Expansion</h3>
+    <p>To accelerate the creation of typed nodes, the extension supports template expansion. When a user types <code>@Book</code> followed by a space, the extension <strong>inserts</strong> a pre-defined block of text into the document. From that point on, the new content is styled just like any other text.</p>
+
+    <h3>Focus Mode</h3>
+    <p>Focus Mode allows users to "hoist" a specific folding block, collapsing all other sections of the document. This provides a distraction-free environment for concentrating on a single part of a larger outline.</p>
+</section>
+    </main>
+    <footer>
+        <p>&copy; 2025 Point Blank. All rights reserved.</p>
+    </footer>
+    <script src="/assets/js/main.js"></script>
+</body>
+</html>

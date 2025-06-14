@@ -1,47 +1,24 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Point Blank - Contributing</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-    <header>
-        <h1>Point Blank Documentation</h1>
-        <nav>
-            <ul>
-                <li><a href="index.html">Home</a></li>
-                <li><a href="features.html">Features</a></li>
-                <li><a href="architecture.html">Architecture</a></li>
-                <li><a href="contributing.html">Contributing</a></li>
-            </ul>
-        </nav>
-    </header>
-    <main>
-        <section id="contributing-content">
-            <h2>Contributing to Point Blank</h2>
-            <p>Contributions are welcome! Point Blank's architecture is designed to be modular, performant, and maintainable, centered around an immutable document model that serves as the single source of truth. Key components include:</p>
-            <ul>
-                <li><code>DocumentModel</code>: Manages the document's state and uses <code>DocumentParser</code> to create an immutable <code>DocumentTree</code>.</li>
-                <li><code>DecorationManager</code>: Applies visual decorations to the editor based on the <code>DocumentTree</code> and <code>DecorationCalculator</code>.</li>
-                <li><code>CommandManager</code>: Registers and handles all user commands, interacting with the <code>DocumentModel</code> and other components.</li>
-            </ul>
-            <p>If you're interested in contributing, please feel free to open an issue or submit a pull request.</p>
+---
+layout: default
+title: Contributing
+---
 
-            <h3>Development Setup</h3>
-            <p>To get started with development:</p>
-            <ol>
-                <li>Clone the repository.</li>
-                <li>Run <code>pnpm install</code> to install the dependencies.</li>
-                <li>Run <code>pnpm run watch</code> to start the webpack watcher.</li>
-                <li>Press <code>F5</code> to open a new VS Code window with the extension loaded.</li>
-            </ol>
-        </section>
-    </main>
-    <footer>
-        <p>&copy; 2025 Point Blank. All rights reserved.</p>
-    </footer>
-    <script src="main.js"></script>
-</body>
-</html>
+<section id="contributing-content">
+    <h2>Contributing to Point Blank</h2>
+    <p>Contributions are welcome! Point Blank's architecture is designed to be modular, performant, and maintainable, centered around an immutable document model that serves as the single source of truth. Key components include:</p>
+    <ul>
+        <li><code>DocumentModel</code>: Manages the document's state and uses <code>DocumentParser</code> to create an immutable <code>DocumentTree</code>.</li>
+        <li><code>DecorationManager</code>: Applies visual decorations to the editor based on the <code>DocumentTree</code> and <code>DecorationCalculator</code>.</li>
+        <li><code>CommandManager</code>: Registers and handles all user commands, interacting with the <code>DocumentModel</code> and other components.</li>
+    </ul>
+    <p>If you're interested in contributing, please feel free to open an issue or submit a pull request.</p>
+
+    <h3>Development Setup</h3>
+    <p>To get started with development:</p>
+    <ol>
+        <li>Clone the repository.</li>
+        <li>Run <code>pnpm install</code> to install the dependencies.</li>
+        <li>Run <code>pnpm run watch</code> to start the webpack watcher.</li>
+        <li>Press <code>F5</code> to open a new VS Code window with the extension loaded.</li>
+    </ol>
+</section>

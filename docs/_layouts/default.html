@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ page.title }} - Point Blank Documentation</title>
+    <link rel="stylesheet" href="{{ '/assets/css/style.css' | relative_url }}">
+</head>
+<body>
+    <header>
+        <h1>Point Blank Documentation</h1>
+        <nav>
+            <ul>
+                <li><a href="{{ '/index.html' | relative_url }}">Home</a></li>
+                <li><a href="{{ '/features.html' | relative_url }}">Features</a></li>
+                <li><a href="{{ '/architecture.html' | relative_url }}">Architecture</a></li>
+                <li><a href="{{ '/contributing.html' | relative_url }}">Contributing</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        {{ content }}
+    </main>
+    <footer>
+        <p>&copy; 2025 Point Blank. All rights reserved.</p>
+    </footer>
+    <script src="{{ '/assets/js/main.js' | relative_url }}"></script>
+</body>
+</html>
