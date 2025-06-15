@@ -235,7 +235,7 @@ export class CommandManager {
                 const formattedResults = files.map(file => `- [[${path.relative(vscode.workspace.workspaceFolders![0].uri.fsPath, file)}]]`).join('\n');
                 const queryComment = `<!-- pointblank:query ${queryString} -->`;
 
-                const snippet = new vscode.SnippetString(`${queryComment}\n${formattedResults}\n`);
+                const snippet = new vscode.SnippetString(`${formattedResults}\n${queryComment}\n`);
                 editor.insertSnippet(snippet, editor.selection.active);
             }),
 
@@ -246,8 +246,8 @@ export class CommandManager {
                 let queryCommentLine: vscode.TextLine | undefined;
                 let fullQueryString: string | undefined;
 
-                // Search upwards for the query comment
-                for (let i = activePosition.line; i >= 0; i--) {
+                // Search downwards for the query comment
+                for (let i = activePosition.line; i < document.lineCount; i++) {
                     const line = document.lineAt(i);
                     const match = line.text.match(/<!-- pointblank:query (.*?) -->/);
                     if (match) {
@@ -258,33 +258,35 @@ export class CommandManager {
                 }
 
                 if (!queryCommentLine || !fullQueryString) {
-                    vscode.window.showWarningMessage('No "pointblank:query" comment found above the cursor.');
+                    vscode.window.showWarningMessage('No "pointblank:query" comment found below the cursor.');
                     return;
                 }
 
                 const files = await this.queryService.executeQuery(fullQueryString);
                 const newFormattedResults = files.map(file => `- [[${path.relative(vscode.workspace.workspaceFolders![0].uri.fsPath, file)}]]`).join('\n');
+                const newQueryComment = `<!-- pointblank:query ${fullQueryString} -->`;
 
-                const queryCommentEndLine = queryCommentLine.lineNumber;
-                let resultsEndLine = queryCommentEndLine;
+                const queryCommentStartLine = queryCommentLine.lineNumber;
+                let resultsStartLine = queryCommentStartLine;
 
-                // Determine the end of the existing results block
-                for (let i = queryCommentEndLine + 1; i < document.lineCount; i++) {
+                // Determine the start of the existing results block (searching upwards from the comment)
+                for (let i = queryCommentStartLine - 1; i >= 0; i--) {
                     const line = document.lineAt(i);
                     // Stop if we hit another query comment, an empty line, or a line that doesn't look like a result
                     if (line.text.trim() === '' || line.text.startsWith('<!-- pointblank:query') || !line.text.startsWith('- [[')) {
+                        resultsStartLine = i + 1;
                         break;
                     }
-                    resultsEndLine = i;
+                    resultsStartLine = i;
                 }
 
                 const rangeToReplace = new vscode.Range(
-                    new vscode.Position(queryCommentEndLine + 1, 0),
-                    new vscode.Position(resultsEndLine + 1, 0) // +1 to include the last line and its newline
+                    new vscode.Position(resultsStartLine, 0),
+                    new vscode.Position(queryCommentStartLine + 1, 0) // +1 to include the comment line and its newline
                 );
 
                 await editor.edit(editBuilder => {
-                    editBuilder.replace(rangeToReplace, newFormattedResults + '\n');
+                    editBuilder.replace(rangeToReplace, `${newFormattedResults}\n${newQueryComment}\n`);
                 });
             })
         );
