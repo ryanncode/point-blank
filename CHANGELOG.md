@@ -2,6 +2,16 @@
 
 All notable changes to the "pointblank" extension will be documented in this file.
 
+## [0.5.1] - 2025-06-15
+### Added
+- When creating a new bullet point, it will now inherit the style of the previous line.
+
+### Changed
+- Updated and clarified the names of color-related settings.
+
+### Fixed
+- Resolved widescreen layout issues in the application and on the website.
+
 ## [0.5.0] - 2025-06-14
 ### Changed
 - Upgraded the document parser from a 4-pass to a more efficient 2-pass system, significantly improving performance and reducing lag on large documents.
