@@ -17,7 +17,7 @@ Point Blank's architecture is designed to be modular, performant, and maintainab
 *   `CommandManager`: Registers and handles all user commands, interacting with the `DocumentModel` and other components.
 *   `DocumentParser`: A stateless component solely responsible for converting text into an immutable `DocumentTree`.
 
-For a detailed history of changes, see the [CHANGELOG](CHANGELOG.md).
+For a detailed history of changes, see the [CHANGELOG](https://github.com/ryanncode/point-blank/blob/main/CHANGELOG.md).
 
 This project is licensed under the [LGPL License](LICENSE.md).
 

@@ -1,8 +1,6 @@
 ---
 ---
 
-@import "{{ site.theme }}";
-
 :root {
     --background-color: #22272e; /* Dark background */
     --text-color: #adbac7; /* Light grey text */
@@ -25,9 +23,11 @@ body {
 header {
     background-color: var(--header-bg);
     color: #fff;
-    padding: 1.5em 0;
+    padding: 1.5em 20px; /* Added horizontal padding */
     text-align: center;
     border-bottom: 1px solid var(--border-color);
+    max-width: 1000px; /* Align with main content */
+    margin: 0 auto; /* Center the header */
 }
 
 header h1 {

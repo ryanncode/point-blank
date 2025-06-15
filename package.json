@@ -3,6 +3,10 @@
   "displayName": "Point Blank",
   "publisher": "fastblit",
   "description": "VS Code bullet point outliner mode",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ryanncode/point-blank"
+  },
   "version": "0.5.0",
   "engines": {
     "vscode": "^1.100.0"
