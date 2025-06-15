@@ -10,7 +10,7 @@ All notable changes to the "pointblank" extension will be documented in this fil
 - Updated and clarified the names of color-related settings.
 
 ### Fixed
-- Resolved widescreen layout issues in the application and on the website.
+- Resolved widescreen layout issues on the website.
 
 ## [0.5.0] - 2025-06-14
 ### Changed
