@@ -30,10 +30,6 @@
         "title": "Point Blank: Unfocus"
       },
       {
-        "command": "pointblank.handleEnterKey",
-        "title": "Point Blank: Handle Enter Key"
-      },
-      {
         "command": "pointblank.quickOpenFile",
         "title": "Point Blank: Quick Open File from Template"
       },
@@ -44,6 +40,10 @@
       {
         "command": "pointblank.tab",
         "title": "Point Blank: Handle Tab Key"
+      },
+      {
+        "command": "pointblank.enterKey",
+        "title": "Point Blank: Handle Enter Key"
       }
     ],
     "keybindings": [
@@ -58,11 +58,6 @@
         "key": "alt+u",
         "mac": "alt+u",
         "when": "editorTextFocus"
-      },
-      {
-        "command": "pointblank.handleEnterKey",
-        "key": "enter",
-        "when": "editorTextFocus && !editorHasSelection && (pointblank.lineHasBullet || pointblank.isInTypedNode)"
       },
       {
         "command": "pointblank.quickOpenFile",
@@ -80,6 +75,11 @@
         "key": "ctrl+v",
         "mac": "cmd+v",
         "when": "editorTextFocus && editorLangId == 'markdown' && editorHasSelection == false"
+      },
+      {
+        "key": "enter",
+        "command": "pointblank.enterKey",
+        "when": "editorTextFocus && editorLangId == 'markdown'"
       }
     ],
     "configuration": {

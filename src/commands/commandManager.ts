@@ -3,7 +3,7 @@ import { ExtensionState } from '../state/extensionState';
 import { DocumentModel } from '../document/documentModel';
 import { BlockNode } from '../document/blockNode';
 import { PasteWithBullets } from './pasteWithBullets';
-import { EnterKeyHandler } from './handleEnterKey';
+import { EnterKeyHandler } from './enterKey';
 import { getBulletFromLine } from '../utils/bulletPointUtils';
 
 /**
@@ -34,7 +34,7 @@ export class CommandManager {
         context.subscriptions.push(
             vscode.window.onDidChangeTextEditorSelection(event => {
                 const editor = event.textEditor;
-                if (!editor) return;
+                if (!editor) { return; }
 
                 const documentModel = this.extensionState.getDocumentModel(editor.document.uri.toString());
                 if (!documentModel) {
@@ -91,10 +91,6 @@ export class CommandManager {
             const typedChar = args.text;
 
             // If the typed character is a newline, delegate to our custom Enter key handler.
-            if (typedChar === '\n' || typedChar === '\r') {
-                await vscode.commands.executeCommand('pointblank.handleEnterKey');
-                return;
-            }
 
             // Check if the user is typing '[[', especially at the beginning of a line after a bullet.
             // This is a specific trigger for Foam's backlink completion.

@@ -6,6 +6,7 @@ export interface KeyValueProperty {
     value: string;
     range: vscode.Range; // Range of the entire key-value line
     keyRange: vscode.Range; // Range of just the "Key::" part
+    valueRange?: vscode.Range; // Range of just the "Value" part (optional, as value might be empty)
 }
 
 /**
@@ -90,7 +91,8 @@ export class BlockNode {
                 key: keyPart.slice(0, -2), // Remove "::"
                 value: valuePart,
                 range: fullRange,
-                keyRange: keyRange
+                keyRange: keyRange,
+                valueRange: valuePart ? new vscode.Range(this.lineNumber, keyStartChar + keyPart.length + 1, this.lineNumber, keyStartChar + keyPart.length + 1 + valuePart.length) : undefined
             };
             return { isKeyValue: true, keyValue, isTypedNode: false, isCodeBlockDelimiter: false };
         }

@@ -40,8 +40,24 @@ export async function expandTemplateCommand(typeName: string, documentModel: Doc
     const templateLines = templateBody.split('\n').filter(l => l.trim() !== '');
     const propertiesText = templateLines
         .map(prop => {
-            const cleanedProp = prop.replace(/::\s*$/, '');
-            return `${currentIndent}${propertyIndent}${cleanedProp}:: `;
+            // Case 1: Line already contains '::' and does not end with '::' (e.g., "Type:: Book")
+            // This means it's a type definition with a value, so no extra ":: " or property indent.
+            if (prop.includes('::') && !prop.trim().endsWith('::')) {
+                return `${currentIndent}${prop.trim()}`;
+            } else {
+                // Case 2: Line is a property placeholder (e.g., "Title::") or a type definition
+                // that ends with '::' in the template (e.g., "Type:: Book::").
+                const cleanedProp = prop.replace(/::\s*$/, ''); // Remove any trailing "::"
+
+                // If after cleaning, the line still contains '::', it means it was a type definition
+                // like "Type:: Book" (after cleaning "Type:: Book::"). In this case, no extra ":: " is needed.
+                if (cleanedProp.includes('::')) {
+                    return `${currentIndent}${cleanedProp}`;
+                } else {
+                    // Otherwise, it's a regular property placeholder (e.g., "Title"), so append ":: "
+                    return `${currentIndent}${cleanedProp}:: `;
+                }
+            }
         })
         .join('\n');
 
@@ -59,13 +75,13 @@ export async function expandTemplateCommand(typeName: string, documentModel: Doc
 
         // Position the cursor in the value section of the second line (the line immediately following the Type:: line)
         // This means the first inserted property line.
-        const firstPropertyLine = editor.document.lineAt(triggerLineNumber);
+        const firstPropertyLine = editor.document.lineAt(triggerLineNumber + 1); // The first inserted property line is now at triggerLineNumber + 1
         const firstPropertyKeyValueMatch = firstPropertyLine.text.match(/^\s*(\S.*?)::\s*(.*)$/);
         let newCursorCharacter = firstPropertyLine.firstNonWhitespaceCharacterIndex;
         if (firstPropertyKeyValueMatch && firstPropertyKeyValueMatch[1]) {
             newCursorCharacter = firstPropertyLine.text.indexOf('::') + 3; // After ":: "
         }
-        const newCursorPosition = new vscode.Position(triggerLineNumber, newCursorCharacter);
+        const newCursorPosition = new vscode.Position(triggerLineNumber + 1, newCursorCharacter); // Position cursor on the second line
         editor.selection = new vscode.Selection(newCursorPosition, newCursorPosition);
     });
 }

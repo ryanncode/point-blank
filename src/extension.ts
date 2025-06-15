@@ -10,7 +10,7 @@ import { ExtensionState } from './state/extensionState';
 import { Configuration } from './config/configuration';
 import { focusModeCommand } from './commands/focusMode';
 import { unfocusModeCommand } from './commands/unfocusMode';
-import { EnterKeyHandler } from './commands/handleEnterKey';
+import { EnterKeyHandler } from './commands/enterKey';
 import { expandTemplateCommand } from './commands/expandTemplate';
 import { quickOpenFileCommand } from './commands/quickOpenFile';
 import { TemplateService } from './templates/templateService';
@@ -36,6 +36,7 @@ export function activate(context: vscode.ExtensionContext): void {
     // --- Component Initializations ---
     const decorationManager = new DecorationManager(extensionState);
     const commandManager = new CommandManager(extensionState);
+    const enterKeyHandler = new EnterKeyHandler(extensionState);
 
     // Initialize decoration types from configuration and prepare the manager.
     decorationManager.initialize();
@@ -52,7 +53,7 @@ export function activate(context: vscode.ExtensionContext): void {
     context.subscriptions.push(
         vscode.commands.registerCommand('pointblank.focusMode', () => focusModeCommand(extensionState)),
         vscode.commands.registerCommand('pointblank.unfocusMode', unfocusModeCommand),
-        vscode.commands.registerCommand('pointblank.handleEnterKey', () => new EnterKeyHandler(extensionState).handleEnterKeyCommand()),
+        vscode.commands.registerCommand('pointblank.enterKey', () => enterKeyHandler.handleEnterKeyCommand()),
         vscode.commands.registerCommand('pointblank.expandTemplate', expandTemplateCommand),
         vscode.commands.registerCommand('pointblank.quickOpenFile', quickOpenFileCommand)
     );
