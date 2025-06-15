@@ -8,8 +8,6 @@ Point Blank offers intelligent list styling, hierarchical folding, and support f
 
 For a comprehensive overview of features, commands, configuration, and contributing guidelines, please visit our [documentation website](https://ryanncode.github.io/point-blank/).
 
-For a detailed history of changes, see the [CHANGELOG](CHANGELOG.md).
-
 ## Architecture
 
 Point Blank's architecture is designed to be modular, performant, and maintainable, centered around an immutable document model that serves as the single source of truth. Key components include:
@@ -17,6 +15,8 @@ Point Blank's architecture is designed to be modular, performant, and maintainab
 *   `DocumentModel`: Manages the document's state and uses `DocumentParser` to create an immutable `DocumentTree`.
 *   `DecorationManager`: Applies visual decorations to the editor based on the `DocumentTree` and `DecorationCalculator`.
 *   `CommandManager`: Registers and handles all user commands, interacting with the `DocumentModel` and other components.
+
+For a detailed history of changes, see the [CHANGELOG](CHANGELOG.md).
 
 ## Contributing
 
