@@ -15,8 +15,9 @@ export class DocumentModel {
     private _parser: DocumentParser;
     private _decorationManager?: DecorationManager;
     private _disposables: vscode.Disposable[] = [];
-    private _isParsing: boolean = false; // New flag to indicate parsing in progress
-    private _onDidParseEventEmitter = new vscode.EventEmitter<void>(); // New event emitter
+    private _isParsing: boolean = false;
+    private _onDidParseEventEmitter = new vscode.EventEmitter<void>();
+    private _isBulkUpdating: boolean = false; // New flag for bulk updates
 
     constructor(document: vscode.TextDocument) {
         this._document = document;
@@ -77,6 +78,11 @@ export class DocumentModel {
             return;
         }
 
+        // If a bulk update is in progress, defer incremental parsing until the bulk update completes.
+        if (this._isBulkUpdating) {
+            return;
+        }
+
         // Update the internal document reference to the latest version
         this._document = event.document;
 
@@ -125,6 +131,23 @@ export class DocumentModel {
 
         if (this._decorationManager) {
             this._decorationManager.updateDecorations(this._documentTree);
+        }
+    }
+
+    /**
+     * Performs a series of document edits as a single, atomic operation from the perspective of the DocumentModel.
+     * During a bulk update, incremental parsing is temporarily suspended, and a single full parse is triggered
+     * at the end to ensure the document tree is consistent.
+     * @param updateFn A function containing the VS Code editor edits.
+     */
+    public async performBulkUpdate(updateFn: () => Promise<void>): Promise<void> {
+        this._isBulkUpdating = true;
+        try {
+            await updateFn();
+        } finally {
+            this._isBulkUpdating = false;
+            // After the bulk update, force a full re-parse to ensure the model is up-to-date.
+            this.performFullParse(this._document);
         }
     }
 }

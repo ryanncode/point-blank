@@ -145,7 +145,7 @@ export class EnterKeyHandler {
             let effectiveLineEndForNavigation = currentBlockNode.line.text.trimEnd().length;
             if (currentBlockNode.isKeyValue && currentBlockNode.keyValue) {
                 // For key-value pairs, consider the end of the key part plus ":: "
-                effectiveLineEndForNavigation = currentBlockNode.keyValue.keyRange.end.character + 2;
+                effectiveLineEndForNavigation = currentBlockNode.keyValue.keyRange.end.character + 1;
             }
             if (position.character >= effectiveLineEndForNavigation) {
                 // Navigation logic
@@ -243,7 +243,7 @@ export class EnterKeyHandler {
         const line = node.lineNumber;
         let char = node.indent;
         if (node.isKeyValue && node.keyValue) {
-            char = node.keyValue.keyRange.end.character + 2; // After ":: "
+            char = node.keyValue.keyRange.end.character + 1; // After "::" (the space is at +1)
         }
         const newPosition = new vscode.Position(line, char);
         editor.selection = new vscode.Selection(newPosition, newPosition);

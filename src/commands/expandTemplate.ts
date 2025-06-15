@@ -55,31 +55,30 @@ export async function expandTemplateCommand(typeName: string, _documentModel: Do
         })
         .join('');
 
-    const deleteRange = new vscode.Range(line.lineNumber, atSymbolIndex, line.lineNumber, position.character);
+    // Perform all edits as a single, atomic bulk update operation.
+    await _documentModel.performBulkUpdate(async () => {
+        const deleteRange = new vscode.Range(line.lineNumber, atSymbolIndex, line.lineNumber, position.character);
 
-    // Step 1: Delete the trigger text (@TypeName).
-    await editor.edit(editBuilder => {
-        editBuilder.delete(deleteRange);
+        // Step 1: Delete the trigger text (@TypeName).
+        await editor.edit(editBuilder => {
+            editBuilder.delete(deleteRange);
+        });
+
+        // Step 2: Insert the new title line (e.g., (Book)).
+        // The position for insertion is where the trigger was, as it's now deleted.
+        await editor.edit(editBuilder => {
+            editBuilder.insert(new vscode.Position(line.lineNumber, atSymbolIndex), newTitleLineContent);
+        });
+
+        // Step 3: Insert the property lines.
+        // The insertion point is at the end of the newly inserted title line.
+        const titleLineEnd = new vscode.Position(line.lineNumber, newTitleLineContent.length);
+        await editor.edit(editBuilder => {
+            editBuilder.insert(titleLineEnd, propertiesText);
+        });
+
+        // Reposition the cursor to the end of the newly inserted title line.
+        const newCursorPosition = new vscode.Position(line.lineNumber, newTitleLineContent.length);
+        editor.selection = new vscode.Selection(newCursorPosition, newCursorPosition);
     });
-
-    // Step 2: Insert the new title line (e.g., (Book)).
-    // The position for insertion is where the trigger was, as it's now deleted.
-    await editor.edit(editBuilder => {
-        editBuilder.insert(new vscode.Position(line.lineNumber, atSymbolIndex), newTitleLineContent);
-    });
-
-    // Step 3: Insert the property lines.
-    // The insertion point is at the end of the newly inserted title line.
-    const titleLineEnd = new vscode.Position(line.lineNumber, newTitleLineContent.length);
-    await editor.edit(editBuilder => {
-        editBuilder.insert(titleLineEnd, propertiesText);
-    });
-
-    // Reposition the cursor to the end of the newly inserted title line.
-    const newCursorPosition = new vscode.Position(line.lineNumber, newTitleLineContent.length);
-    editor.selection = new vscode.Selection(newCursorPosition, newCursorPosition);
-
-    // Force a full re-parse of the document to ensure the model is up-to-date
-    // and decorations are applied immediately.
-    _documentModel.updateAfterProgrammaticEdit(editor.document);
 }
