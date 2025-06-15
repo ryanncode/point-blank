@@ -19,6 +19,8 @@ Point Blank's architecture is designed to be modular, performant, and maintainab
 
 For a detailed history of changes, see the [CHANGELOG](CHANGELOG.md).
 
+This project is licensed under the [LGPL License](LICENSE.md).
+
 ## Contributing
 
 Contributions are welcome! If you're interested in contributing, please feel free to open an issue or submit a pull request.

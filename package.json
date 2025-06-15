@@ -1,8 +1,9 @@
 {
   "name": "pointblank",
   "displayName": "Point Blank",
-  "description": "Text outliner mode",
-  "version": "0.0.1",
+  "publisher": "fastblit",
+  "description": "VS Code bullet point outliner mode",
+  "version": "0.5.0",
   "engines": {
     "vscode": "^1.100.0"
   },
@@ -80,25 +81,25 @@
     "configuration": {
       "title": "Point Blank",
       "properties": {
-        "pointblank.level1Color": {
+        "pointblank.defaultBulletColor": {
           "type": "string",
-          "description": "Color for level 1 decorators."
+          "description": "Color for default bullet decorators."
         },
-        "pointblank.level2Color": {
+        "pointblank.starBulletColor": {
           "type": "string",
-          "description": "Color for level 2 decorators."
+          "description": "Color for '*' bullet decorators."
         },
-        "pointblank.level3Color": {
+        "pointblank.plusBulletColor": {
           "type": "string",
-          "description": "Color for level 3 decorators."
+          "description": "Color for '+' bullet decorators."
         },
-        "pointblank.level4Color": {
+        "pointblank.minusBulletColor": {
           "type": "string",
-          "description": "Color for level 4 decorators."
+          "description": "Color for '-' bullet decorators."
         },
-        "pointblank.level5Color": {
+        "pointblank.numberedBulletColor": {
           "type": "string",
-          "description": "Color for level 5 decorators."
+          "description": "Color for numbered bullet decorators."
         },
         "pointblank.blockquoteColor": {
           "type": "string",

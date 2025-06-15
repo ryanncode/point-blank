@@ -9,11 +9,11 @@ Here are the configurable settings for the Point Blank VS Code extension:
 
 | Setting | Description | Default |
 | --- | --- | --- |
-| `pointblank.level1Color` | Color for level 1 decorators. | |
-| `pointblank.level2Color` | Color for level 2 decorators. | |
-| `pointblank.level3Color` | Color for level 3 decorators. | |
-| `pointblank.level4Color` | Color for level 4 decorators. | |
-| `pointblank.level5Color` | Color for level 5 decorators. | |
+| `pointblank.defaultBulletColor` | Color for default bullet decorators. | |
+| `pointblank.starBulletColor` | Color for '*' bullet decorators. | |
+| `pointblank.plusBulletColor` | Color for '+' bullet decorators. | |
+| `pointblank.minusBulletColor` | Color for '-' bullet decorators. | |
+| `pointblank.numberedBulletColor` | Color for numbered bullet decorators. | |
 | `pointblank.blockquoteColor` | Color for blockquote decorators. | `#808080` |
 | `pointblank.keyValueColor` | The color for Key:: properties. | `#6c757d` |
 | `pointblank.templates` | Map of type names to their template file paths. | `{"Book": ".vscode/templates/book.md", "Person": ".vscode/templates/person.md"}` |

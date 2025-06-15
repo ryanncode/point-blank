@@ -56,25 +56,25 @@ export class Configuration {
 
         // Decoration for '*' bullet points.
         decorationOptions.set('starBulletDecorationType', {
-            color: config.get('level2Color') || new vscode.ThemeColor('editorWarning.foreground'),
+            color: config.get('starBulletColor') || new vscode.ThemeColor('editorWarning.foreground'),
             rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
         });
 
         // Decoration for '+' bullet points.
         decorationOptions.set('plusBulletDecorationType', {
-            color: config.get('level3Color') || new vscode.ThemeColor('editorGutter.addedBackground'),
+            color: config.get('plusBulletColor') || new vscode.ThemeColor('editorGutter.addedBackground'),
             rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
         });
 
         // Decoration for '-' bullet points.
         decorationOptions.set('minusBulletDecorationType', {
-            color: config.get('level4Color') || new vscode.ThemeColor('editorGutter.deletedBackground'),
+            color: config.get('minusBulletColor') || new vscode.ThemeColor('editorGutter.deletedBackground'),
             rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
         });
 
         // Decoration for numbered bullet points (e.g., "1.", "2)").
         decorationOptions.set('numberedBulletDecorationType', {
-            color: config.get('level5Color') || new vscode.ThemeColor('editorBracketHighlight.foreground3'),
+            color: config.get('numberedBulletColor') || new vscode.ThemeColor('editorBracketHighlight.foreground3'),
             rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
         });
 
