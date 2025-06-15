@@ -25,12 +25,14 @@ export async function expandTemplateCommand(typeName: string, documentModel: Doc
 
     // Retrieve the template content from the TemplateService.
     const templateService = TemplateService.getInstance();
-    const templateContent = await templateService.getTemplate(typeName);
+    const parsedTemplate = await templateService.getParsedTemplate(typeName);
 
-    if (templateContent === undefined) {
+    if (parsedTemplate === undefined) {
         vscode.window.showWarningMessage(`Point Blank: No template found for type "${typeName}".`);
         return;
     }
+
+    const templateBody = parsedTemplate.body;
 
     let newTitleLineContent: string = '';
 
@@ -46,7 +48,7 @@ export async function expandTemplateCommand(typeName: string, documentModel: Doc
     const propertyIndent = ' '.repeat(tabSize); // Use user's tab size for property indentation
     newTitleLineContent = `${currentIndent}(${typeName}) `;
 
-    const templateLines = templateContent.split('\n').filter(l => l.trim() !== '');
+    const templateLines = templateBody.split('\n').filter(l => l.trim() !== '');
     const propertiesText = templateLines
         .map((prop, index) => {
             // Remove any trailing "::" or ":: " from the template property line

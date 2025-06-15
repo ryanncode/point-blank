@@ -51,6 +51,17 @@ export class TemplateService {
      * @returns A promise that resolves to the template content as a string, or `undefined` if not found.
      */
     public async getTemplate(typeName: string): Promise<string | undefined> {
+        const parsedTemplate = await this.getParsedTemplate(typeName);
+        return parsedTemplate?.body;
+    }
+
+    /**
+     * Retrieves and parses the content of a specific template file, separating front matter from the body.
+     * @param typeName The name of the template to retrieve.
+     * @returns A promise that resolves to an object containing frontMatter (string or null) and body (string),
+     *          or `undefined` if the template is not found or cannot be read.
+     */
+    public async getParsedTemplate(typeName: string): Promise<{ frontMatter: string | null, body: string } | undefined> {
         const templatePathRelative = this.templatesConfig[typeName];
         if (!templatePathRelative) {
             return undefined;
@@ -62,12 +73,38 @@ export class TemplateService {
             return undefined;
         }
 
-        // Resolve the template path relative to the first workspace folder.
         const workspaceRoot = workspaceFolders[0].uri.fsPath;
         const fullTemplatePath = path.join(workspaceRoot, templatePathRelative);
 
         try {
-            return await fs.readFile(fullTemplatePath, 'utf8');
+            const fileContent = await fs.readFile(fullTemplatePath, 'utf8');
+            const lines = fileContent.split('\n');
+
+            let frontMatter: string | null = null;
+            let bodyLines: string[] = [];
+            let inFrontMatter = false;
+            let frontMatterEndLine = -1;
+
+            if (lines[0].trim() === '---') {
+                inFrontMatter = true;
+                for (let i = 1; i < lines.length; i++) {
+                    if (lines[i].trim() === '---') {
+                        inFrontMatter = false;
+                        frontMatterEndLine = i;
+                        break;
+                    }
+                    frontMatter = (frontMatter === null ? '' : frontMatter + '\n') + lines[i];
+                }
+            }
+
+            if (frontMatterEndLine !== -1) {
+                bodyLines = lines.slice(frontMatterEndLine + 1);
+            } else {
+                bodyLines = lines;
+            }
+
+            return { frontMatter, body: bodyLines.join('\n') };
+
         } catch (error) {
             vscode.window.showErrorMessage(`Point Blank: Could not read template file for type '${typeName}' at '${fullTemplatePath}': ${error instanceof Error ? error.message : String(error)}`);
             return undefined;

@@ -36,18 +36,24 @@ export async function quickOpenFileCommand(): Promise<void> {
     if (!fileName) return; // User cancelled
 
     // --- Step 2: Prepare File Content ---
-    const templateContent = await templateService.getTemplate(selectedTemplateName);
-    if (!templateContent) {
+    const parsedTemplate = await templateService.getParsedTemplate(selectedTemplateName);
+    if (!parsedTemplate) {
         vscode.window.showErrorMessage(`Point Blank: Could not retrieve content for template '${selectedTemplateName}'.`);
         return;
     }
 
     // Format the template content with a title line and indented properties.
-    const propertiesText = templateContent.split('\n')
+    const propertiesText = parsedTemplate.body.split('\n')
         .filter(l => l.trim() !== '')
-        .map(prop => `\n  - ${prop}`)
+        .map(prop => `\n${prop}`)
         .join('');
-    const finalContent = `(${selectedTemplateName})${propertiesText}`;
+    
+    let finalContent = `(${selectedTemplateName})${propertiesText}`;
+
+    // Prepend front matter if it exists
+    if (parsedTemplate.frontMatter) {
+        finalContent = `---\n${parsedTemplate.frontMatter}\n---\n${finalContent}`;
+    }
 
     // --- Step 3: Determine File Path and Ensure Uniqueness ---
     const workspaceFolders = vscode.workspace.workspaceFolders;
