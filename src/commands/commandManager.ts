@@ -230,43 +230,39 @@ export class CommandManager {
                     return; // User cancelled
                 }
 
-                const files = await this.queryService.findFilesByType(typeName);
+                const queryString = `LIST FROM Type:: ${typeName}`;
+                const files = await this.queryService.executeQuery(queryString);
                 const formattedResults = files.map(file => `- [[${path.relative(vscode.workspace.workspaceFolders![0].uri.fsPath, file)}]]`).join('\n');
-                const queryComment = `<!-- pointblank:query LIST FROM type:: ${typeName} -->`;
+                const queryComment = `<!-- pointblank:query ${queryString} -->`;
 
                 const snippet = new vscode.SnippetString(`${queryComment}\n${formattedResults}\n`);
                 editor.insertSnippet(snippet, editor.selection.active);
             }),
+
             vscode.commands.registerTextEditorCommand('pointblank.updateTypeQuery', async (editor) => {
                 const document = editor.document;
                 const activePosition = editor.selection.active;
 
                 let queryCommentLine: vscode.TextLine | undefined;
-                let queryCommentMatch: RegExpMatchArray | null = null;
+                let fullQueryString: string | undefined;
 
                 // Search upwards for the query comment
                 for (let i = activePosition.line; i >= 0; i--) {
                     const line = document.lineAt(i);
-                    const match = line.text.match(/<!-- pointblank:query LIST FROM type:: (.*?) -->/);
+                    const match = line.text.match(/<!-- pointblank:query (.*?) -->/);
                     if (match) {
                         queryCommentLine = line;
-                        queryCommentMatch = match;
+                        fullQueryString = match[1].trim();
                         break;
                     }
                 }
 
-                if (!queryCommentLine || !queryCommentMatch) {
+                if (!queryCommentLine || !fullQueryString) {
                     vscode.window.showWarningMessage('No "pointblank:query" comment found above the cursor.');
                     return;
                 }
 
-                const typeName = queryCommentMatch[1].trim();
-                if (!typeName) {
-                    vscode.window.showWarningMessage('Could not extract type name from the query comment.');
-                    return;
-                }
-
-                const files = await this.queryService.findFilesByType(typeName);
+                const files = await this.queryService.executeQuery(fullQueryString);
                 const newFormattedResults = files.map(file => `- [[${path.relative(vscode.workspace.workspaceFolders![0].uri.fsPath, file)}]]`).join('\n');
 
                 const queryCommentEndLine = queryCommentLine.lineNumber;
