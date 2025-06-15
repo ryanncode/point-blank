@@ -70,7 +70,7 @@ export class BlockNode {
      * @returns An object containing the parsed properties.
      */
     private parseLineContent() {
-        const trimmedText = this.text.trim();
+        const trimmedText = this.text.substring(this.indent);
 
         // Check for code block delimiter: ```
         if (trimmedText.startsWith('```')) {
@@ -78,7 +78,7 @@ export class BlockNode {
         }
 
         // Check for Key:: Value pattern.
-        const keyValueMatch = trimmedText.match(/^(-\s*)?(\S+::)\s*(.*)/);
+        const keyValueMatch = trimmedText.match(/^(-\s*)?(\S+::) (.*)/);
         if (keyValueMatch) {
             const leadingDash = keyValueMatch[1] || '';
             const keyPart = keyValueMatch[2];

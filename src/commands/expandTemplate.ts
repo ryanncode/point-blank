@@ -8,8 +8,7 @@ import { ExtensionState } from '../state/extensionState';
  * This function replaces the trigger text with a formatted template from user settings.
  *
  * @param typeName The name of the template type to expand.
- * @param _documentModel The document model, passed for context but not directly used,
- *                       as the `onDidChangeTextDocument` event handles the re-parse.
+ * @param _documentModel The document model, used to force a full re-parse after programmatic edits.
  */
 export async function expandTemplateCommand(typeName: string, _documentModel: DocumentModel): Promise<void> {
     const editor = vscode.window.activeTextEditor;
@@ -35,7 +34,6 @@ export async function expandTemplateCommand(typeName: string, _documentModel: Do
 
     let newTitleLineContent: string = '';
 
-    // --- 1. Delete the Trigger Text ---
     // Find the '@' symbol to determine the start of the trigger text.
     const atSymbolIndex = line.text.indexOf('@', line.firstNonWhitespaceCharacterIndex);
     if (atSymbolIndex === -1) {
@@ -43,38 +41,45 @@ export async function expandTemplateCommand(typeName: string, _documentModel: Do
         return;
     }
 
-    // The range to delete includes everything from the '@' to the cursor (which is after the space).
+    // Prepare the new title line and properties text.
+    const currentIndent = line.text.substring(0, line.firstNonWhitespaceCharacterIndex);
+    const propertyIndent = ' '.repeat(tabSize); // Use user's tab size for property indentation
+    newTitleLineContent = `${currentIndent}(${typeName}) `;
+
+    const templateLines = templateContent.split('\n').filter(l => l.trim() !== '');
+    const propertiesText = templateLines
+        .map(prop => {
+            // Remove any trailing "::" or ":: " from the template property line
+            const cleanedProp = prop.replace(/::\s*$/, '');
+            return `\n${currentIndent}${propertyIndent}${cleanedProp}:: `;
+        })
+        .join('');
+
     const deleteRange = new vscode.Range(line.lineNumber, atSymbolIndex, line.lineNumber, position.character);
+
+    // Step 1: Delete the trigger text (@TypeName).
     await editor.edit(editBuilder => {
         editBuilder.delete(deleteRange);
     });
 
-    // --- 2. Prepare and Insert New Content ---
-    const currentIndent = line.text.substring(0, line.firstNonWhitespaceCharacterIndex);
-    const propertyIndent = ' '.repeat(tabSize); // Use user's tab size for property indentation
-
-    // Create the new title line, e.g., "  (Book) "
-    newTitleLineContent = `${currentIndent}(${typeName}) `;
-
-    // Format and insert the template properties, indented under the title line.
-    const templateLines = templateContent.split('\n').filter(l => l.trim() !== '');
-    const propertiesText = templateLines
-        .map(prop => `\n${currentIndent}${propertyIndent}${prop}`) // Indent properties by user's tab size, no bullet.
-        .join('');
-
+    // Step 2: Insert the new title line (e.g., (Book)).
+    // The position for insertion is where the trigger was, as it's now deleted.
     await editor.edit(editBuilder => {
-        editBuilder.insert(line.range.start, newTitleLineContent);
-        editBuilder.insert(line.range.end, propertiesText);
+        editBuilder.insert(new vscode.Position(line.lineNumber, atSymbolIndex), newTitleLineContent);
     });
 
-    // --- 3. Reposition the Cursor ---
-    // Move the cursor to the end of the newly inserted title line for a smooth editing flow.
+    // Step 3: Insert the property lines.
+    // The insertion point is at the end of the newly inserted title line.
+    const titleLineEnd = new vscode.Position(line.lineNumber, newTitleLineContent.length);
+    await editor.edit(editBuilder => {
+        editBuilder.insert(titleLineEnd, propertiesText);
+    });
+
+    // Reposition the cursor to the end of the newly inserted title line.
     const newCursorPosition = new vscode.Position(line.lineNumber, newTitleLineContent.length);
     editor.selection = new vscode.Selection(newCursorPosition, newCursorPosition);
 
-    // Crucially, force the document model to update after the programmatic edit.
-    // This ensures that subsequent commands (like Enter key handling) operate on an up-to-date tree.
-    // Add a small delay to allow VS Code's internal document model to fully synchronize.
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Force a full re-parse of the document to ensure the model is up-to-date
+    // and decorations are applied immediately.
     _documentModel.updateAfterProgrammaticEdit(editor.document);
 }

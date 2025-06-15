@@ -48,6 +48,7 @@ export class EnterKeyHandler {
         let currentBlockNode = documentModel.documentTree.getNodeAtLine(position.line);
         const currentLine = document.lineAt(position.line);
 
+
         // --- Just-in-Time Re-parse for Stale Tree after Template Insertion ---
         // This addresses the edge case where the document model might be temporarily inconsistent
         // immediately after a large programmatic edit (like template insertion).
@@ -141,8 +142,12 @@ export class EnterKeyHandler {
         // Case 2: Cursor is on a property line of the typed node.
         const currentChildIndex = typedNodeChildren.findIndex((child: BlockNode) => child.lineNumber === currentBlockNode.lineNumber);
         if (currentChildIndex !== -1) {
-            const trimmedLineEnd = currentBlockNode.line.text.trimEnd().length;
-            if (position.character >= trimmedLineEnd) {
+            let effectiveLineEndForNavigation = currentBlockNode.line.text.trimEnd().length;
+            if (currentBlockNode.isKeyValue && currentBlockNode.keyValue) {
+                // For key-value pairs, consider the end of the key part plus ":: "
+                effectiveLineEndForNavigation = currentBlockNode.keyValue.keyRange.end.character + 2;
+            }
+            if (position.character >= effectiveLineEndForNavigation) {
                 // Navigation logic
                 if (currentChildIndex < typedNodeChildren.length - 1) {
                     this.moveCursorToNodeValue(editor, typedNodeChildren[currentChildIndex + 1]);
