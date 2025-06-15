@@ -15,6 +15,7 @@ Point Blank's architecture is designed to be modular, performant, and maintainab
 *   `DocumentModel`: Manages the document's state and uses `DocumentParser` to create an immutable `DocumentTree`.
 *   `DecorationManager`: Applies visual decorations to the editor based on the `DocumentTree` and `DecorationCalculator`.
 *   `CommandManager`: Registers and handles all user commands, interacting with the `DocumentModel` and other components.
+*   `DocumentParser`: A stateless component solely responsible for converting text into an immutable `DocumentTree`.
 
 For a detailed history of changes, see the [CHANGELOG](CHANGELOG.md).
 
