@@ -26,8 +26,6 @@ header {
     padding: 1.5em 20px; /* Added horizontal padding */
     text-align: center;
     border-bottom: 1px solid var(--border-color);
-    max-width: 1000px; /* Align with main content */
-    margin: 0 auto; /* Center the header */
 }
 
 header h1 {
@@ -60,8 +58,6 @@ nav ul li a:hover {
 
 main {
     padding: 40px 20px;
-    max-width: 1000px;
-    margin: 30px auto;
     background-color: #2d333b; /* Slightly lighter dark for content area */
     border-radius: 6px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
@@ -108,6 +104,10 @@ footer {
     padding: 25px;
     background-color: var(--footer-bg);
     color: var(--secondary-text-color);
-    margin-top: 40px;
     border-top: 1px solid var(--border-color);
+}
+
+.container {
+    max-width: 1000px;
+    margin: 0 auto;
 }
