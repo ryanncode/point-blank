@@ -24,8 +24,76 @@ title: Features
     <h3>Typed Nodes for Structured Data</h3>
     <p>A key feature of Point Blank is the concept of "typed nodes." By writing a line like <code>(Book)</code>, users can create a structured data block. This block can contain key-value pairs (e.g., <code>Author:: John Doe</code>) that are visually distinguished and can be navigated with custom keybindings, streamlining data entry.</p>
 
-    <h3>Template Expansion</h3>
-    <p>To accelerate the creation of typed nodes, the extension supports template expansion. When a user types <code>@Book</code> followed by a space, the extension <strong>inserts</strong> a pre-defined block of text into the document. From that point on, the new content is styled just like any other text.</p>
+    <h2 id="templates">Templates</h2>
+    <p>
+      Point Blank's template system has been significantly refactored to provide
+      a more robust and intuitive way to create structured data.
+    </p>
+
+    <h3>File-Based Templates</h3>
+    <p>
+      Templates are now defined as Markdown files (<code>.md</code>) and stored
+      in a dedicated directory: <code>.vscode/templates/</code> within your
+      workspace. Each template file must begin with a required
+      <code>Type::</code> key-value pair, which defines the type of the node
+      this template will create.
+    </p>
+    <p>
+      For example, a template for a "Task" node would be saved as
+      <code>.vscode/templates/Task.md</code> and start with:
+    </p>
+    <pre><code class="language-markdown">Type:: Task
+Status:: TODO
+Due::
+Tags::
+</code></pre>
+    <p>
+      Template files can optionally include <a href="https://yaml.org/spec/1.2/spec.html#id2760373">YAML front matter</a>
+      at the very top of the file, enclosed by triple-dashed lines (<code>---</code>).
+      This front matter can be used for additional metadata about the template
+      itself (e.g., author, description), but it is *not* inserted into your
+      document when the template is expanded inline. It is primarily used for
+      features like the "Quick Open File Type Template" command.
+    </p>
+    <p>Example with YAML front matter:</p>
+    <pre><code class="language-markdown">---
+description: A template for creating new task items.
+author: Your Name
+---
+Type:: Task
+Status:: TODO
+Due::
+Tags::
+</code></pre>
+
+    <h3>Inline Template Expansion</h3>
+    <p>
+      The syntax for inline template expansion has been updated for clarity and
+      consistency. To insert a typed node using a template, simply type the
+      template's <code>Type</code> name followed by <code>::</code> and a space.
+      For example, to insert a "Task" node, you would type:
+    </p>
+    <pre><code class="language-markdown">Task:: </code></pre>
+    <p>
+      Upon typing the space after <code>Task::</code>, the extension will
+      automatically expand the template, inserting the key-value pairs defined
+      in your <code>Task.md</code> file directly into your document. The
+      <code>Type::</code> line you typed will be replaced by the template's
+      content.
+    </p>
+    <p>
+      For example, typing <code>Task:: </code> would expand to:
+    </p>
+    <pre><code class="language-markdown">Type:: Task
+Status:: TODO
+Due::
+Tags::
+</code></pre>
+    <p>
+      This new syntax ensures that the inserted content is always a clean list
+      of key-value pairs, without an extra "node type title line" that was
+      present in previous versions.
+    </p>
 
     <h3>Focus Mode</h3>
     <p>Focus Mode allows users to "hoist" a specific folding block, collapsing all other sections of the document. This provides a distraction-free environment for concentrating on a single part of a larger outline.</p>

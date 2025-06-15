@@ -12,6 +12,12 @@ All notable changes to the "pointblank" extension will be documented in this fil
 ### Fixed
 - Resolved widescreen layout issues on the website.
 
+## [0.6.0] - 2025-06-15
+### Changed
+- Major refactor of the template system. Templates are now defined by a `Type::` property and stored in `.vscode/templates`.
+- Inline template expansion is now triggered by `TypeName::` instead of the old `@TypeName` syntax.
+### Added
+- Support for optional YAML front matter in template files for extended metadata (though not used in inline expansion).
 ## [0.5.0] - 2025-06-14
 ### Changed
 - Upgraded the document parser from a 4-pass to a more efficient 2-pass system, significantly improving performance and reducing lag on large documents.

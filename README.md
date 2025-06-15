@@ -6,7 +6,7 @@ Point Blank is a VS Code extension designed to transform the markdown editing ex
 
 ## Features
 
-Point Blank offers intelligent list styling, hierarchical folding, and support for structured data templates.
+Point Blank offers intelligent list styling, hierarchical folding, and support for structured data templates. This includes a refactored template system with new syntax for file-based templates and inline node insertion.
 
 For a comprehensive overview of features, commands, configuration, and contributing guidelines, please visit our [documentation website](https://ryanncode.github.io/point-blank/).
 
