@@ -56,21 +56,25 @@ export class QueryService {
     }
 
     private parseQuery(queryString: string): { type?: string; whereKey?: string; whereValue?: string; sortKey?: string; sortOrder?: 'ASC' | 'DESC' } | null {
-        const listFromMatch = queryString.match(/LIST FROM Type::\s*(\w+)/);
-        if (!listFromMatch) {
-            return null;
-        }
-        const type = listFromMatch[1];
+        const queryRegex = /^LIST FROM Type::\s*(\w+)(?:\s+WHERE\s+([\w\s]+)::\s*(.*?))?(?:\s+SORT BY\s+([\w\s]+)\s+(ASC|DESC))?$/;
+        const match = queryString.match(queryRegex);
 
-        const whereMatch = queryString.match(/WHERE\s+(\w+)::\s*(.+)/);
-        const sortMatch = queryString.match(/SORT BY\s+(\w+)\s+(ASC|DESC)/);
+        if (!match) {
+            return null; // Invalid query format or order
+        }
+
+        const type = match[1];
+        const whereKey = match[2];
+        const whereValue = match[3];
+        const sortKey = match[4];
+        const sortOrder = match[5] ? (match[5].toUpperCase() as 'ASC' | 'DESC') : undefined;
 
         return {
             type: type,
-            whereKey: whereMatch ? whereMatch[1] : undefined,
-            whereValue: whereMatch ? whereMatch[2] : undefined,
-            sortKey: sortMatch ? sortMatch[1] : undefined,
-            sortOrder: sortMatch ? (sortMatch[2].toUpperCase() as 'ASC' | 'DESC') : undefined
+            whereKey: whereKey,
+            whereValue: whereValue,
+            sortKey: sortKey,
+            sortOrder: sortOrder
         };
     }
 
