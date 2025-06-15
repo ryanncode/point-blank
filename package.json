@@ -73,7 +73,7 @@
       {
         "command": "pointblank.tab",
         "key": "tab",
-        "when": "editorTextFocus && pointblank.lineHasBullet"
+        "when": "editorTextFocus && pointblank.atBulletStart"
       },
       {
         "command": "pointblank.pasteWithBullets",

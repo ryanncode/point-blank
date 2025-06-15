@@ -37,17 +37,24 @@ export class CommandManager {
                 if (!editor) return;
 
                 const documentModel = this.extensionState.getDocumentModel(editor.document.uri.toString());
-                if (!documentModel) return;
+                if (!documentModel) {
+                    vscode.commands.executeCommand('setContext', 'pointblank.atBulletStart', false);
+                    return;
+                }
 
                 // Only handle single-line selections for simplicity.
-                if (!editor.selection.isSingleLine) return;
+                if (!editor.selection.isSingleLine) {
+                    vscode.commands.executeCommand('setContext', 'pointblank.atBulletStart', false);
+                    return;
+                }
 
                 const line = editor.document.lineAt(editor.selection.active.line);
                 const blockNode = documentModel.documentTree.getNodeAtLine(line.lineNumber);
+                const activePosition = editor.selection.active;
 
+                let atBulletStart = false;
                 if (blockNode && blockNode.bulletRange) {
                     const bulletEndChar = blockNode.bulletRange.end.character;
-                    const activePosition = editor.selection.active;
 
                     // If the cursor is within the bullet's range, move it to the end of the bullet.
                     if (activePosition.character < bulletEndChar) {
@@ -60,7 +67,13 @@ export class CommandManager {
                             editor.selection = new vscode.Selection(editor.selection.anchor, newPosition);
                         }
                     }
+
+                    // Set context key: true if cursor is exactly at the end of the bullet
+                    if (activePosition.character === bulletEndChar) {
+                        atBulletStart = true;
+                    }
                 }
+                vscode.commands.executeCommand('setContext', 'pointblank.atBulletStart', atBulletStart);
             })
         );
     }
@@ -156,19 +169,10 @@ export class CommandManager {
         // --- `tab` Command Override ---
         // Indents the line if the cursor is at the end of a bullet.
         const tabCommand = vscode.commands.registerTextEditorCommand('pointblank.tab', async (editor) => {
-            const documentModel = this.extensionState.getDocumentModel(editor.document.uri.toString());
+            // This command will only be executed when 'pointblank.atBulletStart' context is true,
+            // as defined in package.json keybindings.
             const position = editor.selection.active;
             const line = editor.document.lineAt(position.line);
-            const blockNode = documentModel?.documentTree.getNodeAtLine(line.lineNumber);
-
-            // Check if the current line has a Point Blank bullet and the cursor is at its end.
-            // If not, or if there's no document model, defer to the default tab command.
-            if (!documentModel || !blockNode || !blockNode.bulletRange || position.character !== blockNode.bulletRange.end.character) {
-                await vscode.commands.executeCommand('default:tab');
-                return;
-            }
-
-            // If cursor is exactly at the end of the bullet, indent the entire line.
             await editor.edit(editBuilder => {
                 editBuilder.insert(new vscode.Position(line.lineNumber, 0), '    ');
             });
