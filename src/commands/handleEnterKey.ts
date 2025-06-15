@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { ExtensionState } from '../state/extensionState';
 import { BlockNode } from '../document/blockNode';
 import { findTypedNodeParent } from '../utils/nodeUtils';
+import { getBulletFromLine } from '../utils/bulletPointUtils';
 
 /**
  * Provides the logic for the `pointblank.handleEnterKey` command, overriding the default
@@ -197,12 +198,14 @@ export class EnterKeyHandler {
         await editor.edit(editBuilder => {
             // Delete text after the cursor on the current line.
             editBuilder.delete(new vscode.Range(position, currentLine.range.end));
-            // Insert a new line with indentation, a bullet, and the moved text.
-            editBuilder.insert(position, `\n${indentation}• ${textAfterCursor}`);
+            // Determine the bullet point based on the current line.
+            const bullet = getBulletFromLine(currentLine);
+            // Insert a new line with indentation, the determined bullet, and the moved text.
+            editBuilder.insert(position, `\n${indentation}${bullet}${textAfterCursor}`);
         });
 
         // Position the cursor after the new bullet point.
-        const newPosition = new vscode.Position(position.line + 1, indentation.length + 2); // After '• '
+        const newPosition = new vscode.Position(position.line + 1, indentation.length + getBulletFromLine(currentLine).length);
         editor.selection = new vscode.Selection(newPosition, newPosition);
     }
 

@@ -4,6 +4,7 @@ import { DocumentModel } from '../document/documentModel';
 import { BlockNode } from '../document/blockNode';
 import { PasteWithBullets } from './pasteWithBullets';
 import { EnterKeyHandler } from './handleEnterKey';
+import { getBulletFromLine } from '../utils/bulletPointUtils';
 
 /**
  * Manages the registration and logic for all commands, including overrides for default VS Code behavior.
@@ -83,8 +84,14 @@ export class CommandManager {
                 if (line.text.trim().length === 0 && position.character === line.firstNonWhitespaceCharacterIndex) {
                     const markdownPrefixRegex = /^\s*([\*\+\-@]|>|#{1,6}|\d+[\.\)])/;
                     if (!markdownPrefixRegex.test(typedChar)) {
+                        let bulletToInsert = '• '; // Default bullet
+                        if (position.line > 0) {
+                            const previousLine = editor.document.lineAt(position.line - 1);
+                            bulletToInsert = getBulletFromLine(previousLine);
+                        }
+
                         await editor.edit(editBuilder => {
-                            editBuilder.insert(position, '• ' + typedChar);
+                            editBuilder.insert(position, bulletToInsert + typedChar);
                         });
                         handledByExtension = true;
                     }

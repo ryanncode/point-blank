@@ -62,3 +62,52 @@ export function determineBulletType(
 
     return { bulletType: 'none' };
 }
+
+/**
+ * Determines the appropriate bullet string to use for a new line based on the provided line.
+ * If the provided line has a recognized bullet, it returns that bullet. Otherwise, it returns the default bullet.
+ *
+ * @param line The `vscode.TextLine` to analyze.
+ * @returns The bullet string (e.g., "* ", "+ ", "- ", "1. ", "> ", or "• ").
+ */
+export function getBulletFromLine(line: vscode.TextLine): string {
+    const lineText = line.text;
+    const indent = line.firstNonWhitespaceCharacterIndex;
+    const lineNumber = line.lineNumber;
+
+    // Determine the bullet type of the provided line.
+    const bulletInfo = determineBulletType(
+        lineText,
+        indent,
+        false, // Assuming not a code block delimiter for this context
+        false, // Assuming not excluded for this context
+        lineNumber
+    );
+
+    // Return the corresponding bullet string based on the detected type.
+    switch (bulletInfo.bulletType) {
+        case 'star':
+            return '* ';
+        case 'plus':
+            return '+ ';
+        case 'minus':
+            return '- ';
+        case 'numbered':
+            // For numbered lists, we need to increment the number.
+            // This is a simplified approach; a more robust solution might track list state.
+            const match = lineText.substring(indent).match(/^(\d+)/);
+            if (match && match[1]) {
+                const num = parseInt(match[1], 10);
+                return `${num + 1}. `;
+            }
+            return '1. '; // Fallback if parsing number fails
+        case 'blockquote':
+            return '> ';
+        case 'atSign':
+            return '@'; // At-sign is special, it's not followed by a space for insertion
+        case 'default':
+        case 'none': // If no specific bullet, or default, use the default bullet.
+        default:
+            return '• ';
+    }
+}
