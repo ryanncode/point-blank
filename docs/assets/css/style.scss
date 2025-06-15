@@ -94,9 +94,13 @@ p, ul, ol {
 code {
     background-color: #3e4451;
     color: #adbac7;
-    padding: 0.2em 0.4em;
     border-radius: 3px;
     font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+}
+
+/* Apply padding only to inline code, not code within pre blocks */
+code:not(pre > code) {
+    padding: 0.2em 0.4em;
 }
 
 footer {
