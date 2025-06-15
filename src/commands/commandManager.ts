@@ -77,12 +77,31 @@ export class CommandManager {
             const line = editor.document.lineAt(position.line);
             const typedChar = args.text;
 
-            let handledByExtension = false;
+            // Check if the user is typing '[[', especially at the beginning of a line after a bullet.
+            // This is a specific trigger for Foam's backlink completion.
+            if (typedChar === '[' && position.character > 0 && line.text.charAt(position.character - 1) === '[') {
+                await vscode.commands.executeCommand('default:type', args);
+                return;
+            }
+
+            // Check if the cursor is inside an already formed Foam backlink (e.g., [[...]])
+            const textBeforeCursor = line.text.substring(0, position.character);
+            const textAfterCursor = line.text.substring(position.character);
+            const isInsideBacklink = /\[\[[^\]]*$/.test(textBeforeCursor) && /^[^\[]*\]\]/.test(textAfterCursor);
+
+            if (isInsideBacklink) {
+                // If inside a backlink, defer to the default type command to allow Foam to handle it.
+                await vscode.commands.executeCommand('default:type', args);
+                return;
+            }
 
             // Scenario 1: Auto-insert bullet on empty line if not already a markdown prefix
             if (typedChar.length === 1 && !typedChar.includes('\n') && !typedChar.includes('\r')) {
                 if (line.text.trim().length === 0 && position.character === line.firstNonWhitespaceCharacterIndex) {
                     const markdownPrefixRegex = /^\s*([\*\+\-@]|>|#{1,6}|\d+[\.\)])/;
+                    // Only insert a bullet if the typed character is NOT a markdown prefix.
+                    // This allows VS Code's default 'type' command to handle markdown prefixes like '[[',
+                    // ensuring interoperability with other extensions like Foam.
                     if (!markdownPrefixRegex.test(typedChar)) {
                         let bulletToInsert = '• '; // Default bullet
                         if (position.line > 0) {
@@ -91,17 +110,17 @@ export class CommandManager {
                         }
 
                         await editor.edit(editBuilder => {
-                            editBuilder.insert(position, bulletToInsert + typedChar);
+                            // Insert only the bullet point. The actual character typed by the user
+                            // will be handled by the default:type command below.
+                            editBuilder.insert(position, bulletToInsert);
                         });
-                        handledByExtension = true;
                     }
                 }
             }
 
-            // If our custom logic didn't handle the initial character insertion, let default:type do it.
-            if (!handledByExtension) {
-                await vscode.commands.executeCommand('default:type', args);
-            }
+            // Always let the default 'type' command handle the character insertion.
+            // This ensures other extensions (like Foam) can correctly process the typed character.
+            await vscode.commands.executeCommand('default:type', args);
 
             // After character is typed (either by us or default), check for key-value pair and remove bullet if necessary.
             await this.handleKeyValueBulletRemoval(editor, position.line);
@@ -138,30 +157,21 @@ export class CommandManager {
         // Indents the line if the cursor is at the end of a bullet.
         const tabCommand = vscode.commands.registerTextEditorCommand('pointblank.tab', async (editor) => {
             const documentModel = this.extensionState.getDocumentModel(editor.document.uri.toString());
-            if (!documentModel) {
-                vscode.commands.executeCommand('default:tab');
+            const position = editor.selection.active;
+            const line = editor.document.lineAt(position.line);
+            const blockNode = documentModel?.documentTree.getNodeAtLine(line.lineNumber);
+
+            // Check if the current line has a Point Blank bullet and the cursor is at its end.
+            // If not, or if there's no document model, defer to the default tab command.
+            if (!documentModel || !blockNode || !blockNode.bulletRange || position.character !== blockNode.bulletRange.end.character) {
+                await vscode.commands.executeCommand('default:tab');
                 return;
             }
 
-            const position = editor.selection.active;
-            const line = editor.document.lineAt(position.line);
-            const blockNode = documentModel.documentTree.getNodeAtLine(line.lineNumber);
-
-            if (blockNode && blockNode.bulletRange) {
-                // If cursor is exactly at the end of the bullet, indent the entire line.
-                if (position.character === blockNode.bulletRange.end.character) {
-                    await editor.edit(editBuilder => {
-                        editBuilder.insert(new vscode.Position(line.lineNumber, 0), '    ');
-                    });
-                } else {
-                    // Otherwise, insert a regular tab at the cursor position.
-                    await editor.edit(editBuilder => {
-                        editBuilder.insert(position, '\t');
-                    });
-                }
-            } else {
-                vscode.commands.executeCommand('default:tab');
-            }
+            // If cursor is exactly at the end of the bullet, indent the entire line.
+            await editor.edit(editBuilder => {
+                editBuilder.insert(new vscode.Position(line.lineNumber, 0), '    ');
+            });
         });
 
         // --- Other Command Registrations ---
