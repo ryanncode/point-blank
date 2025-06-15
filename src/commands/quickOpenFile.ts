@@ -10,10 +10,10 @@ import { Configuration } from '../config/configuration';
  */
 export async function quickOpenFileCommand(): Promise<void> {
     const templateService = TemplateService.getInstance();
-    const templateNames = templateService.getTemplateNames();
+    const templateNames = templateService.getTemplateNames(); // This now dynamically loads from files
 
     if (templateNames.length === 0) {
-        vscode.window.showInformationMessage('Point Blank: No templates configured. Please define templates in your settings.');
+        vscode.window.showInformationMessage('Point Blank: No templates found in .vscode/templates directory. Please create template files with a "Type::" property.');
         return;
     }
 
@@ -48,7 +48,7 @@ export async function quickOpenFileCommand(): Promise<void> {
         .map(prop => `\n${prop}`)
         .join('');
     
-    let finalContent = `(${selectedTemplateName})${propertiesText}`;
+    let finalContent = `${propertiesText}`;
 
     // Prepend front matter if it exists
     if (parsedTemplate.frontMatter) {
@@ -80,9 +80,14 @@ export async function quickOpenFileCommand(): Promise<void> {
         const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(uniqueFullPath));
         const editor = await vscode.window.showTextDocument(doc);
 
-        // Place cursor at the end of the title line for immediate editing.
-        const firstLine = editor.document.lineAt(0);
-        const position = new vscode.Position(0, firstLine.text.length + 1);
+        // Place cursor at the end of the first line for immediate editing.
+        // If there's front matter, the cursor should be after the closing '---'.
+        // If no front matter, it's the first line of properties.
+        let cursorLine = 0;
+        if (parsedTemplate.frontMatter) {
+            cursorLine = (parsedTemplate.frontMatter.split('\n').length || 0) + 2; // +2 for '---' lines
+        }
+        const position = new vscode.Position(cursorLine, 0); // Start of the first property line
         editor.selection = new vscode.Selection(position, position);
         editor.revealRange(new vscode.Range(position, position));
 

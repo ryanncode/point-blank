@@ -8,16 +8,11 @@ import * as fs from 'fs/promises';
  */
 export class TemplateService {
     private static instance: TemplateService;
-    private templatesConfig: { [key: string]: string } = {};
+    private templateMap: Map<string, string> = new Map(); // Maps typeName to full file path
 
     private constructor() {
-        this.loadConfiguration();
-        // Listen for changes to the configuration and reload templates if necessary.
-        vscode.workspace.onDidChangeConfiguration(e => {
-            if (e.affectsConfiguration('pointblank.templates')) {
-                this.loadConfiguration();
-            }
-        });
+        this.loadTemplates();
+        // No longer listening for 'pointblank.templates' config changes
     }
 
     /**
@@ -31,18 +26,54 @@ export class TemplateService {
     }
 
     /**
-     * Loads the template configuration from the user's settings.
+     * Scans the .vscode/templates directory for .md files, parses the 'Type::' property,
+     * and populates the internal templateMap. Files without a 'Type::' property are ignored.
      */
-    private loadConfiguration(): void {
-        const config = vscode.workspace.getConfiguration('pointblank');
-        this.templatesConfig = config.get('templates', {});
+    private async loadTemplates(): Promise<void> {
+        this.templateMap.clear(); // Clear existing map before reloading
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders || workspaceFolders.length === 0) {
+            vscode.window.showErrorMessage('Point Blank: No workspace folder is open. Cannot load templates.');
+            return;
+        }
+
+        const workspaceRoot = workspaceFolders[0].uri.fsPath;
+        const templatesDir = path.join(workspaceRoot, '.vscode', 'templates');
+
+        try {
+            const files = await fs.readdir(templatesDir);
+            for (const file of files) {
+                if (file.endsWith('.md')) {
+                    const fullPath = path.join(templatesDir, file);
+                    try {
+                        const fileContent = await fs.readFile(fullPath, 'utf8');
+                        const typeMatch = fileContent.match(/^Type::\s*(.*)$/m);
+                        if (typeMatch && typeMatch[1]) {
+                            const typeName = typeMatch[1].trim();
+                            this.templateMap.set(typeName, fullPath);
+                        } else {
+                            console.warn(`Point Blank: Template file '${file}' in '${templatesDir}' is missing a 'Type::' property and will be ignored.`);
+                        }
+                    } catch (readError) {
+                        console.error(`Point Blank: Could not read template file '${file}': ${readError instanceof Error ? readError.message : String(readError)}`);
+                    }
+                }
+            }
+        } catch (error: any) {
+            if (error.code === 'ENOENT') {
+                // Directory does not exist, which is fine if no templates are configured.
+                console.log(`Point Blank: No templates directory found at '${templatesDir}'.`);
+            } else {
+                vscode.window.showErrorMessage(`Point Blank: Failed to load templates from '${templatesDir}': ${error.message}`);
+            }
+        }
     }
 
     /**
      * Returns an array of all configured template names.
      */
     public getTemplateNames(): string[] {
-        return Object.keys(this.templatesConfig);
+        return Array.from(this.templateMap.keys());
     }
 
     /**
@@ -62,19 +93,17 @@ export class TemplateService {
      *          or `undefined` if the template is not found or cannot be read.
      */
     public async getParsedTemplate(typeName: string): Promise<{ frontMatter: string | null, body: string } | undefined> {
-        const templatePathRelative = this.templatesConfig[typeName];
-        if (!templatePathRelative) {
-            return undefined;
+        let fullTemplatePath = this.templateMap.get(typeName);
+
+        // If template not found, try reloading templates once.
+        if (!fullTemplatePath) {
+            await this.loadTemplates();
+            fullTemplatePath = this.templateMap.get(typeName);
         }
 
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (!workspaceFolders || workspaceFolders.length === 0) {
-            vscode.window.showErrorMessage('Point Blank: No workspace folder is open, cannot resolve template path.');
-            return undefined;
+        if (!fullTemplatePath) {
+            return undefined; // Still not found after reload
         }
-
-        const workspaceRoot = workspaceFolders[0].uri.fsPath;
-        const fullTemplatePath = path.join(workspaceRoot, templatePathRelative);
 
         try {
             const fileContent = await fs.readFile(fullTemplatePath, 'utf8');
