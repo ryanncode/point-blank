@@ -15,7 +15,7 @@ yarn-error.log*
 *.d.ts
 
 # Jekyll
-/vendor/
+docs/vendor/
 
 # VS Code Extension specific
 *.vsix
