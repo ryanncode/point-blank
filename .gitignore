@@ -14,6 +14,9 @@ yarn-error.log*
 *.js.map
 *.d.ts
 
+# Jekyll
+/vendor/
+
 # VS Code Extension specific
 *.vsix
 .vscode-test-results/
