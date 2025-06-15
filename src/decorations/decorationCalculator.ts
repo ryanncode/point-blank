@@ -43,7 +43,7 @@ export class DecorationCalculator {
                     }
                 }
             }
-        });
+        }, `Decoration calculation for ${nodes.length} nodes`);
     }
 
     /**

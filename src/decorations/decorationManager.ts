@@ -103,7 +103,7 @@ private _debouncedUpdate: (editor: vscode.TextEditor, tree: DocumentTree) => voi
             this._decorationTypes.forEach((decorationType, typeName) => {
                 editor.setDecorations(decorationType, decorationsToApply.get(typeName) || []);
             });
-        });
+        }, `Decoration rendering for ${editor.document.uri.fsPath}`);
     }
 
     /**
