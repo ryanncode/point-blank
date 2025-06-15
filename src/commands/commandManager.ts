@@ -135,6 +135,18 @@ export class CommandManager {
             // This ensures other extensions (like Foam) can correctly process the typed character.
             await vscode.commands.executeCommand('default:type', args);
 
+            // After character is typed (either by us or default), check if '::' was just typed
+            // and auto-complete to ':: '.
+            const currentPositionAfterType = editor.selection.active;
+            const currentLineAfterType = editor.document.lineAt(currentPositionAfterType.line);
+            const textBeforeCursorAfterType = currentLineAfterType.text.substring(0, currentPositionAfterType.character);
+
+            if (textBeforeCursorAfterType.endsWith('::')) {
+                await editor.edit(editBuilder => {
+                    editBuilder.insert(currentPositionAfterType, ' ');
+                });
+            }
+
             // After character is typed (either by us or default), check for key-value pair and remove bullet if necessary.
             await this.handleKeyValueBulletRemoval(editor, position.line);
         });
@@ -219,8 +231,8 @@ export class CommandManager {
         // Check if the line starts with our default bullet '• ' (after indentation)
         if (lineText.substring(currentLineIndentation).startsWith(bulletPrefix)) {
             const contentAfterBullet = lineText.substring(currentLineIndentation + bulletPrefix.length);
-            // Regex to match "word::" at the beginning of the content after the bullet
-            const keyValuePattern = /^(\S+::)/; // Matches "Key::"
+            // Regex to match "word:: " at the beginning of the content after the bullet
+            const keyValuePattern = /^(\S+::\s)/; // Matches "Key:: "
             const keyValueMatch = contentAfterBullet.match(keyValuePattern);
 
             if (keyValueMatch) {

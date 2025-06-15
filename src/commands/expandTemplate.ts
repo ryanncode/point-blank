@@ -8,9 +8,9 @@ import { ExtensionState } from '../state/extensionState';
  * This function replaces the trigger text with a formatted template from user settings.
  *
  * @param typeName The name of the template type to expand.
- * @param _documentModel The document model, used to force a full re-parse after programmatic edits.
+ * @param documentModel The document model, used to force a full re-parse after programmatic edits.
  */
-export async function expandTemplateCommand(typeName: string, _documentModel: DocumentModel): Promise<void> {
+export async function expandTemplateCommand(typeName: string, documentModel: DocumentModel): Promise<void> {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
         return;
@@ -48,15 +48,19 @@ export async function expandTemplateCommand(typeName: string, _documentModel: Do
 
     const templateLines = templateContent.split('\n').filter(l => l.trim() !== '');
     const propertiesText = templateLines
-        .map(prop => {
+        .map((prop, index) => {
             // Remove any trailing "::" or ":: " from the template property line
             const cleanedProp = prop.replace(/::\s*$/, '');
+            // For the last property, do not add a trailing space after "::"
+            if (index === templateLines.length - 1) {
+                return `\n${currentIndent}${propertyIndent}${cleanedProp}::`;
+            }
             return `\n${currentIndent}${propertyIndent}${cleanedProp}:: `;
         })
         .join('');
 
     // Perform all edits as a single, atomic bulk update operation.
-    await _documentModel.performBulkUpdate(async () => {
+    await documentModel.performBulkUpdate(async () => {
         const deleteRange = new vscode.Range(line.lineNumber, atSymbolIndex, line.lineNumber, position.character);
 
         // Step 1: Delete the trigger text (@TypeName).
