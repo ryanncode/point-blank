@@ -7,7 +7,7 @@
     "type": "git",
     "url": "https://github.com/ryanncode/point-blank"
   },
-  "version": "0.5.1",
+  "version": "0.5.2",
   "engines": {
     "vscode": "^1.100.0"
   },
