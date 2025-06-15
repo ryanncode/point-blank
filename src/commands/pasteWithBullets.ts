@@ -191,8 +191,12 @@ export class PasteWithBullets {
             if (bulletType !== 'none') {
                 // If the line has a bullet, preserve it and its content
                 processedLine = `${line.substring(bulletRange!.start.character, bulletRange!.end.character)}${contentAfterBullet}`;
-            } else {
-                // If no bullet, add a default one
+            } else if (contentAfterBullet.trim() === '') {
+                // If the line is empty or only whitespace, do not add a bullet
+                processedLine = contentAfterBullet;
+            }
+            else {
+                // If no bullet and not empty, add a default one
                 processedLine = `• ${contentAfterBullet}`;
             }
 
