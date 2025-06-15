@@ -5,15 +5,19 @@ import { BlockNode } from '../document/blockNode';
 import { PasteWithBullets } from './pasteWithBullets';
 import { EnterKeyHandler } from './enterKey';
 import { getBulletFromLine } from '../utils/bulletPointUtils';
+import { QueryService } from '../queries/queryService';
+import * as path from 'path';
 
 /**
  * Manages the registration and logic for all commands, including overrides for default VS Code behavior.
  */
 export class CommandManager {
     private extensionState: ExtensionState;
+    private queryService: QueryService;
 
     constructor(extensionState: ExtensionState) {
         this.extensionState = extensionState;
+        this.queryService = new QueryService();
     }
 
     /**
@@ -214,9 +218,82 @@ export class CommandManager {
             cursorRightCommand,
             tabCommand,
             outdentCommand,
-            pasteWithBulletsCommand
+            pasteWithBulletsCommand,
+            // --- New Commands ---
+            vscode.commands.registerTextEditorCommand('pointblank.insertTypeQuery', async (editor) => {
+                const typeName = await vscode.window.showInputBox({
+                    prompt: 'Enter Type Name',
+                    placeHolder: 'e.g., Task, Note'
+                });
+
+                if (!typeName) {
+                    return; // User cancelled
+                }
+
+                const files = await this.queryService.findFilesByType(typeName);
+                const formattedResults = files.map(file => `- [[${path.relative(vscode.workspace.workspaceFolders![0].uri.fsPath, file)}]]`).join('\n');
+                const queryComment = `<!-- pointblank:query LIST FROM type:: ${typeName} -->`;
+
+                const snippet = new vscode.SnippetString(`${queryComment}\n${formattedResults}\n`);
+                editor.insertSnippet(snippet, editor.selection.active);
+            }),
+            vscode.commands.registerTextEditorCommand('pointblank.updateTypeQuery', async (editor) => {
+                const document = editor.document;
+                const activePosition = editor.selection.active;
+
+                let queryCommentLine: vscode.TextLine | undefined;
+                let queryCommentMatch: RegExpMatchArray | null = null;
+
+                // Search upwards for the query comment
+                for (let i = activePosition.line; i >= 0; i--) {
+                    const line = document.lineAt(i);
+                    const match = line.text.match(/<!-- pointblank:query LIST FROM type:: (.*?) -->/);
+                    if (match) {
+                        queryCommentLine = line;
+                        queryCommentMatch = match;
+                        break;
+                    }
+                }
+
+                if (!queryCommentLine || !queryCommentMatch) {
+                    vscode.window.showWarningMessage('No "pointblank:query" comment found above the cursor.');
+                    return;
+                }
+
+                const typeName = queryCommentMatch[1].trim();
+                if (!typeName) {
+                    vscode.window.showWarningMessage('Could not extract type name from the query comment.');
+                    return;
+                }
+
+                const files = await this.queryService.findFilesByType(typeName);
+                const newFormattedResults = files.map(file => `- [[${path.relative(vscode.workspace.workspaceFolders![0].uri.fsPath, file)}]]`).join('\n');
+
+                const queryCommentEndLine = queryCommentLine.lineNumber;
+                let resultsEndLine = queryCommentEndLine;
+
+                // Determine the end of the existing results block
+                for (let i = queryCommentEndLine + 1; i < document.lineCount; i++) {
+                    const line = document.lineAt(i);
+                    // Stop if we hit another query comment, an empty line, or a line that doesn't look like a result
+                    if (line.text.trim() === '' || line.text.startsWith('<!-- pointblank:query') || !line.text.startsWith('- [[')) {
+                        break;
+                    }
+                    resultsEndLine = i;
+                }
+
+                const rangeToReplace = new vscode.Range(
+                    new vscode.Position(queryCommentEndLine + 1, 0),
+                    new vscode.Position(resultsEndLine + 1, 0) // +1 to include the last line and its newline
+                );
+
+                await editor.edit(editBuilder => {
+                    editBuilder.replace(rangeToReplace, newFormattedResults + '\n');
+                });
+            })
         );
     }
+
     /**
      * Checks the current line for a key-value pair pattern immediately following a default bullet
      * and removes the bullet if a match is found.

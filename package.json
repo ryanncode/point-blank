@@ -44,6 +44,14 @@
       {
         "command": "pointblank.enterKey",
         "title": "Point Blank: Handle Enter Key"
+      },
+      {
+        "command": "pointblank.insertTypeQuery",
+        "title": "Point Blank: Insert Type Query"
+      },
+      {
+        "command": "pointblank.updateTypeQuery",
+        "title": "Point Blank: Update Type Query"
       }
     ],
     "keybindings": [
