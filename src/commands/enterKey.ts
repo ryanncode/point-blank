@@ -235,10 +235,8 @@ export class EnterKeyHandler {
      */
     private moveCursorToNodeValue(editor: vscode.TextEditor, node: BlockNode): void {
         const line = node.lineNumber;
-        let char = node.indent;
-        if (node.isKeyValue && node.keyValue) {
-            char = node.keyValue.keyRange.end.character + 1; // After "::" (the space is at +1)
-        }
+        const lineText = editor.document.lineAt(line).text;
+        const char = lineText.length; // Move to the end of the line
         const newPosition = new vscode.Position(line, char);
         editor.selection = new vscode.Selection(newPosition, newPosition);
     }
