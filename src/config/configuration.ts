@@ -54,6 +54,12 @@ export class Configuration {
         const config = this.getConfiguration();
         const decorationOptions = new Map<string, vscode.DecorationRenderOptions>();
 
+        // Decoration for the default bullet point '•'.
+        decorationOptions.set('defaultBulletDecorationType', {
+            color: config.get('defaultBulletColor') || new vscode.ThemeColor('editor.foreground'), // Default to editor foreground
+            rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
+        });
+
         // Decoration for '*' bullet points.
         decorationOptions.set('starBulletDecorationType', {
             color: config.get('starBulletColor') || new vscode.ThemeColor('editorWarning.foreground'),

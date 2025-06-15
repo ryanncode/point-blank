@@ -58,7 +58,8 @@ export class DecorationCalculator {
             case 'plus': return 'plusBulletDecorationType';
             case 'minus': return 'minusBulletDecorationType';
             case 'numbered': return 'numberedBulletDecorationType';
-            // 'atSign', 'default', and 'none' types do not have specific decorations.
+            case 'default': return 'defaultBulletDecorationType'; // Map 'default' bullet type to its decoration
+            // 'atSign' and 'none' types do not have specific decorations.
             default: return undefined;
         }
     }
