@@ -1,5 +1,7 @@
 # Point Blank
 
+[Get it on the VS Code Marketplace!](https://marketplace.visualstudio.com/items?itemName=fastblit.pointblank)
+
 Point Blank is a VS Code extension designed to transform the markdown editing experience into a powerful and intuitive outliner. This tool is intended for writers, developers, and anyone who uses markdown for note-taking, documentation, or brainstorming.
 
 ## Features
