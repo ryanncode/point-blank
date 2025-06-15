@@ -233,9 +233,9 @@ export class CommandManager {
                 const queryString = `LIST FROM Type:: ${typeName}`;
                 const files = await this.queryService.executeQuery(queryString);
                 const formattedResults = files.map(file => `- [[${path.relative(vscode.workspace.workspaceFolders![0].uri.fsPath, file)}]]`).join('\n');
-                const queryComment = `<!-- pointblank:query ${queryString} -->`;
+                const queryBlock = this._formatQueryBlock(formattedResults, queryString);
 
-                const snippet = new vscode.SnippetString(`${formattedResults}\n${queryComment}\n`);
+                const snippet = new vscode.SnippetString(queryBlock);
                 editor.insertSnippet(snippet, editor.selection.active);
             }),
 
@@ -264,7 +264,7 @@ export class CommandManager {
 
                 const files = await this.queryService.executeQuery(fullQueryString);
                 const newFormattedResults = files.map(file => `- [[${path.relative(vscode.workspace.workspaceFolders![0].uri.fsPath, file)}]]`).join('\n');
-                const newQueryComment = `<!-- pointblank:query ${fullQueryString} -->`;
+                const newQueryBlock = this._formatQueryBlock(newFormattedResults, fullQueryString);
 
                 const queryCommentStartLine = queryCommentLine.lineNumber;
                 let resultsStartLine = queryCommentStartLine;
@@ -286,7 +286,7 @@ export class CommandManager {
                 );
 
                 await editor.edit(editBuilder => {
-                    editBuilder.replace(rangeToReplace, `${newFormattedResults}\n${newQueryComment}\n`);
+                    editBuilder.replace(rangeToReplace, newQueryBlock);
                 });
             })
         );
@@ -322,5 +322,16 @@ export class CommandManager {
                 });
             }
         }
+    }
+
+    /**
+     * Formats the query results and the query comment into a single string block.
+     * @param formattedResults The string containing the formatted query results.
+     * @param queryString The original query string.
+     * @returns A string representing the complete query block.
+     */
+    private _formatQueryBlock(formattedResults: string, queryString: string): string {
+        const queryComment = `<!-- pointblank:query ${queryString} -->`;
+        return `${formattedResults}\n${queryComment}\n`;
     }
 }

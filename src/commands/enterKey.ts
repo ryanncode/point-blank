@@ -33,8 +33,6 @@ export class EnterKeyHandler {
             return;
         }
 
-
-
         const currentLine = document.lineAt(position.line);
         const currentBlockNode = documentModel.documentTree.getNodeAtLine(position.line);
 
@@ -71,19 +69,6 @@ export class EnterKeyHandler {
             return; // Explicitly return after handling, consume event
         }
     }
-
-    /**
-     * Attempts to navigate to the next property in a typed node.
-     * @returns `true` if navigation occurred, `false` otherwise.
-     */
-
-    /**
-     * Identifies all adjacent BlockNodes that form a logical property group.
-     * This means finding all sibling nodes at the same or greater indentation level
-     * until a node with less indentation is encountered.
-     * @param currentBlockNode The starting BlockNode.
-     * @returns An array of BlockNode peers in document order.
-     */
 
     /**
      * Splits a property line when the cursor is in the middle of the value.
