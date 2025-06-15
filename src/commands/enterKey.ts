@@ -76,37 +76,6 @@ export class EnterKeyHandler {
      * Attempts to navigate to the next property in a typed node.
      * @returns `true` if navigation occurred, `false` otherwise.
      */
-    private async tryNavigate(editor: vscode.TextEditor, currentBlockNode: BlockNode, position: vscode.Position, propertyPeers: BlockNode[]): Promise<boolean> {
-        // Only navigate if the cursor is at the absolute end of the line
-        if (position.character !== editor.document.lineAt(position.line).text.length) {
-            return false;
-        }
-
-        const currentIndex = propertyPeers.findIndex(node => node.lineNumber === currentBlockNode.lineNumber);
-        if (currentIndex === -1) {
-            return false; // currentBlockNode not found in peers, should not happen if called correctly
-        }
-
-        if (currentIndex < propertyPeers.length - 1) {
-            // There is a next property, navigate to it
-            const nextPropertyNode = propertyPeers[currentIndex + 1];
-            this.moveCursorToNodeValue(editor, nextPropertyNode);
-            return true;
-        } else {
-            // This is the last property in the group, create a new empty line below it
-            const currentLine = editor.document.lineAt(currentBlockNode.lineNumber);
-            const indentation = currentLine.text.substring(0, currentLine.firstNonWhitespaceCharacterIndex);
-            const newLineNumber = currentBlockNode.lineNumber + 1;
-
-            await editor.edit(editBuilder => {
-                editBuilder.insert(new vscode.Position(newLineNumber, 0), indentation + '\n');
-            });
-
-            const newPosition = new vscode.Position(newLineNumber, indentation.length);
-            editor.selection = new vscode.Selection(newPosition, newPosition);
-            return true;
-        }
-    }
 
     /**
      * Identifies all adjacent BlockNodes that form a logical property group.
@@ -181,21 +150,32 @@ export class EnterKeyHandler {
             return true;
         }
 
-        // If it's a property line within a typed node block, handle navigation or new property creation.
-        const logicalBlock = this.findLogicalBlock(currentBlockNode);
-        if (logicalBlock.length > 0) {
-            const propertyPeers = logicalBlock.filter(node => node.isKeyValue || node.isTypedNode);
-            if (isAtEndOfLine) {
-                if (await this.tryNavigate(editor, currentBlockNode, position, propertyPeers)) {
-                    return true;
+        // If it's a property line, handle navigation or new property creation.
+        if (isAtEndOfLine) {
+            // Check if the next line is also a key:: value pair
+            const nextLineNumber = position.line + 1;
+            if (nextLineNumber < document.lineCount) {
+                const nextLine = document.lineAt(nextLineNumber);
+                if (nextLine.text.includes('::')) {
+                    // Move cursor to the next property line
+                    const nextBlockNode = documentModel.documentTree.getNodeAtLine(nextLineNumber);
+                    if (nextBlockNode) {
+                        this.moveCursorToNodeValue(editor, nextBlockNode);
+                        return true;
+                    }
                 }
             }
-            // If not at the end of the line, or tryNavigate didn't handle it, split the property line
-            await this.splitPropertyLine(editor, position, document, currentBlockNode);
+            // If no next property line, or not a key::value, just insert a new line with current indentation
+            const currentLineIndentation = currentLine.text.substring(0, currentLine.firstNonWhitespaceCharacterIndex);
+            await editor.edit(editBuilder => {
+                editBuilder.insert(new vscode.Position(position.line + 1, 0), currentLineIndentation + '\n');
+            });
+            const newPosition = new vscode.Position(position.line + 1, currentLineIndentation.length);
+            editor.selection = new vscode.Selection(newPosition, newPosition);
             return true;
         } else {
-            // If it's a standalone property line (not part of a typed node block), just insert a new line.
-            await vscode.commands.executeCommand('default:type', { text: '\n' });
+            // If not at the end of the line, split the property line
+            await this.splitPropertyLine(editor, position, document, currentBlockNode);
             return true;
         }
     }
@@ -287,41 +267,5 @@ export class EnterKeyHandler {
         };
         traverse(blockNode);
         return { start: blockNode.lineNumber, end: maxLine };
-    }
-    /**
-     * Identifies all adjacent BlockNodes that form a logical block, starting from the current node
-     * and going upwards to find the block's root, then downwards to collect all children
-     * that are part of the same logical indentation block.
-     * This is used to determine the scope of "property peers" or a "folded block".
-     * @param currentBlockNode The starting BlockNode.
-     * @returns An array of BlockNode peers in document order that belong to the same logical block.
-     */
-    private findLogicalBlock(currentBlockNode: BlockNode): BlockNode[] {
-        const block: BlockNode[] = [];
-        if (!currentBlockNode) {
-            return block;
-        }
-
-        // Find the effective root of the current logical block.
-        // This means going up until we find a node with strictly less indentation,
-        // or a node that is a direct child of the document root.
-        let blockRoot: BlockNode = currentBlockNode;
-        while (blockRoot.parent && blockRoot.parent.indent < blockRoot.indent) {
-            blockRoot = blockRoot.parent;
-        }
-
-        // Now, traverse downwards from the blockRoot to collect all nodes
-        // that are part of this logical block (same or greater indentation).
-        const collectChildren = (node: BlockNode) => {
-            block.push(node);
-            for (const child of node.children) {
-                if (child.indent >= blockRoot.indent) {
-                    collectChildren(child);
-                }
-            }
-        };
-
-        collectChildren(blockRoot);
-        return block.sort((a, b) => a.lineNumber - b.lineNumber); // Ensure document order
     }
 }
