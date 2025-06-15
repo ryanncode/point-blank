@@ -5,6 +5,7 @@ import { DecorationCalculator } from './decorationCalculator';
 import { debounce } from '../utils/debounce';
 import { Configuration } from '../config/configuration';
 import { ExtensionState } from '../state/extensionState';
+import { withTiming } from '../utils/debugUtils';
 
 /**
  * Manages the application of text editor decorations. It orchestrates decoration updates
@@ -92,14 +93,16 @@ private _debouncedUpdate: (editor: vscode.TextEditor, tree: DocumentTree) => voi
      * @param tree The current `DocumentTree`.
      */
     private applyDecorations(editor: vscode.TextEditor, tree: DocumentTree): void {
-        const decorationsToApply = new Map<string, vscode.DecorationOptions[]>();
-        this._decorationTypes.forEach((_, key) => decorationsToApply.set(key, []));
+        withTiming(() => {
+            const decorationsToApply = new Map<string, vscode.DecorationOptions[]>();
+            this._decorationTypes.forEach((_, key) => decorationsToApply.set(key, []));
 
         const nodesToDecorate = this.getNodesInViewport(editor, tree);
         DecorationCalculator.calculateDecorations(nodesToDecorate, decorationsToApply);
 
-        this._decorationTypes.forEach((decorationType, typeName) => {
-            editor.setDecorations(decorationType, decorationsToApply.get(typeName) || []);
+            this._decorationTypes.forEach((decorationType, typeName) => {
+                editor.setDecorations(decorationType, decorationsToApply.get(typeName) || []);
+            });
         });
     }
 

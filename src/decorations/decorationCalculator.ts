@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { BlockNode } from '../document/blockNode';
+import { withTiming } from '../utils/debugUtils';
 
 /**
  * A stateless calculator responsible for determining which decorations to apply based on the properties of `BlockNode`s.
@@ -15,32 +16,34 @@ export class DecorationCalculator {
      *                       and values are arrays of `DecorationOptions` to be applied.
      */
     public static calculateDecorations(nodes: BlockNode[], decorationsMap: Map<string, vscode.DecorationOptions[]>): void {
-        for (const node of nodes) {
-            // Skip decoration for code blocks, markdown headers, or empty lines.
-            if (node.isCodeBlockDelimiter || node.isExcluded || node.line.isEmptyOrWhitespace) {
-                continue;
-            }
+        withTiming(() => {
+            for (const node of nodes) {
+                // Skip decoration for code blocks, markdown headers, or empty lines.
+                if (node.isCodeBlockDelimiter || node.isExcluded || node.line.isEmptyOrWhitespace) {
+                    continue;
+                }
 
-            // Handle typed nodes like `(Book)`.
-            if (node.isTypedNode && node.typedNodeRange) {
-                decorationsMap.get('typedNodeDecorationType')!.push({ range: node.typedNodeRange });
-                continue; // Typed nodes don't have other decorations.
-            }
+                // Handle typed nodes like `(Book)`.
+                if (node.isTypedNode && node.typedNodeRange) {
+                    decorationsMap.get('typedNodeDecorationType')!.push({ range: node.typedNodeRange });
+                    continue; // Typed nodes don't have other decorations.
+                }
 
-            // Handle key-value pairs like `Author:: John Doe`.
-            if (node.isKeyValue && node.keyValue) {
-                decorationsMap.get('keyValueDecorationType')!.push({ range: node.keyValue.keyRange });
-                continue; // Key-value pairs don't have other decorations.
-            }
+                // Handle key-value pairs like `Author:: John Doe`.
+                if (node.isKeyValue && node.keyValue) {
+                    decorationsMap.get('keyValueDecorationType')!.push({ range: node.keyValue.keyRange });
+                    continue; // Key-value pairs don't have other decorations.
+                }
 
-            // Handle various bullet point types.
-            if (node.bulletRange) {
-                const decorationType = this.getDecorationTypeForBullet(node.bulletType);
-                if (decorationType) {
-                    decorationsMap.get(decorationType)!.push({ range: node.bulletRange });
+                // Handle various bullet point types.
+                if (node.bulletRange) {
+                    const decorationType = DecorationCalculator.getDecorationTypeForBullet(node.bulletType); // Corrected 'this' to 'DecorationCalculator'
+                    if (decorationType) {
+                        decorationsMap.get(decorationType)!.push({ range: node.bulletRange });
+                    }
                 }
             }
-        }
+        });
     }
 
     /**

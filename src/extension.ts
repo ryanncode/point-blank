@@ -28,6 +28,7 @@ import { InlineCompletionProvider } from './providers/inlineCompletionProvider';
  * @param context The extension context provided by VS Code, used for managing disposables.
  */
 export function activate(context: vscode.ExtensionContext): void {
+
     // --- Singleton Initializations ---
     const extensionState = ExtensionState.getInstance();
     const configuration = Configuration.getInstance();

@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { BlockNode } from './blockNode';
 import { DocumentTree } from './documentTree';
 import { isExcludedLine } from '../decorations/lineFilters'; // Assuming this is still needed for initial exclusion
+import { withTiming } from '../utils/debugUtils';
 
 /**
  * A stateless parser responsible for transforming a `vscode.TextDocument` into an
@@ -30,9 +31,10 @@ export class DocumentParser {
      * @returns A new `DocumentTree` reflecting the applied changes.
      */
     public parse(previousTree: DocumentTree, changes: readonly vscode.TextDocumentContentChangeEvent[]): DocumentTree {
-        if (changes.length === 0) {
-            return previousTree;
-        }
+        return withTiming(() => {
+            if (changes.length === 0) {
+                return previousTree;
+            }
 
         const document = previousTree.document;
         // Determine the range of lines that need to be re-parsed.
@@ -53,6 +55,7 @@ export class DocumentParser {
         // even for newly created nodes or structural changes.
         const rootNodes = this.buildTreeFromFlatList(allNodes);
         return DocumentTree.create(document, rootNodes);
+        });
     }
 
     /**
