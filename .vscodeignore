@@ -12,7 +12,6 @@ vsc-extension-quickstart.md
 **/*.map
 **/*.ts
 **/.vscode-test.*
-notes/**
-.foam-main/**
-PRD.md
 docs/**
+notes/**
+PRD.md

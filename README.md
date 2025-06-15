@@ -8,6 +8,8 @@ Point Blank offers intelligent list styling, hierarchical folding, and support f
 
 For a comprehensive overview of features, commands, configuration, and contributing guidelines, please visit our [documentation website](https://ryanncode.github.io/point-blank/).
 
+For a detailed history of changes, see the [CHANGELOG](CHANGELOG.md).
+
 ## Architecture
 
 Point Blank's architecture is designed to be modular, performant, and maintainable, centered around an immutable document model that serves as the single source of truth. Key components include:
