@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 /**
  * Defines the possible types of bullets that can be recognized.
  */
-export type BulletType = 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'default' | 'atSign' | 'none';
+export type BulletType = 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'default' | 'none';
 
 /**
  * Represents the result of a bullet type determination.
@@ -40,7 +40,6 @@ export function determineBulletType(
 
     // Defines the patterns for recognizing different bullet types.
     const bulletPatterns: { type: BulletType, regex: RegExp }[] = [
-        { type: 'atSign',     regex: /^(@)\s+/ },
         { type: 'star',       regex: /^(\*)\s+/ },
         { type: 'plus',       regex: /^(\+)\s+/ },
         { type: 'minus',      regex: /^(-)\s+/ },
@@ -103,8 +102,6 @@ export function getBulletFromLine(line: vscode.TextLine): string {
             return '1. '; // Fallback if parsing number fails
         case 'blockquote':
             return '> ';
-        case 'atSign':
-            return '@'; // At-sign is special, it's not followed by a space for insertion
         case 'default':
         case 'none': // If no specific bullet, or default, use the default bullet.
         default:

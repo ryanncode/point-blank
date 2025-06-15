@@ -17,7 +17,6 @@ import { TemplateService } from './templates/templateService';
 import { DocumentModel } from './document/documentModel';
 import { DecorationManager } from './decorations/decorationManager';
 import { CommandManager } from './commands/commandManager';
-import { InlineCompletionProvider } from './providers/inlineCompletionProvider';
 
 /**
  * Activates the Point Blank extension.
@@ -45,7 +44,6 @@ export function activate(context: vscode.ExtensionContext): void {
     commandManager.register(context);
 
     // Register the inline completion provider for '@' sign triggers.
-    context.subscriptions.push(new InlineCompletionProvider());
 
     // Set the initial active editor in the extension's state.
     extensionState.setActiveEditor(vscode.window.activeTextEditor);

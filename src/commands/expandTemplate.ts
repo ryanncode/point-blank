@@ -4,20 +4,20 @@ import { DocumentModel } from '../document/documentModel';
 import { ExtensionState } from '../state/extensionState';
 
 /**
- * Expands a template based on a type name (e.g., "Book") triggered by "@TypeName ".
- * This function replaces the trigger text with a formatted template from user settings.
+ * Expands a template based on a type name (e.g., "Book") triggered by "Type:: ".
+ * This function inserts the key-value property lines from the template.
  *
  * @param typeName The name of the template type to expand.
  * @param documentModel The document model, used to force a full re-parse after programmatic edits.
+ * @param triggerLineNumber The line number where the "Type:: " trigger was found.
  */
-export async function expandTemplateCommand(typeName: string, documentModel: DocumentModel): Promise<void> {
+export async function expandTemplateCommand(typeName: string, documentModel: DocumentModel, triggerLineNumber: number): Promise<void> {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
         return;
     }
 
-    const position = editor.selection.active;
-    const line = editor.document.lineAt(position.line);
+    const line = editor.document.lineAt(triggerLineNumber);
 
     // Retrieve the user's configured tab size
     const editorConfig = vscode.workspace.getConfiguration('editor');
@@ -34,57 +34,38 @@ export async function expandTemplateCommand(typeName: string, documentModel: Doc
 
     const templateBody = parsedTemplate.body;
 
-    let newTitleLineContent: string = '';
-
-    // Find the '@' symbol to determine the start of the trigger text.
-    const atSymbolIndex = line.text.indexOf('@', line.firstNonWhitespaceCharacterIndex);
-    if (atSymbolIndex === -1) {
-        // This should not happen if the command is triggered correctly by the InlineCompletionProvider.
-        return;
-    }
-
-    // Prepare the new title line and properties text.
     const currentIndent = line.text.substring(0, line.firstNonWhitespaceCharacterIndex);
     const propertyIndent = ' '.repeat(tabSize); // Use user's tab size for property indentation
-    newTitleLineContent = `${currentIndent}(${typeName}) `;
 
     const templateLines = templateBody.split('\n').filter(l => l.trim() !== '');
     const propertiesText = templateLines
-        .map((prop, index) => {
-            // Remove any trailing "::" or ":: " from the template property line
+        .map(prop => {
             const cleanedProp = prop.replace(/::\s*$/, '');
-            // For the last property, do not add a trailing space after "::"
-            if (index === templateLines.length - 1) {
-                return `\n${currentIndent}${propertyIndent}${cleanedProp}::`;
-            }
-            return `\n${currentIndent}${propertyIndent}${cleanedProp}:: `;
+            return `${currentIndent}${propertyIndent}${cleanedProp}:: `;
         })
-        .join('');
+        .join('\n');
 
     // Perform all edits as a single, atomic bulk update operation.
     await documentModel.performBulkUpdate(async () => {
-        const deleteRange = new vscode.Range(line.lineNumber, atSymbolIndex, line.lineNumber, position.character);
-
-        // Step 1: Delete the trigger text (@TypeName).
+        // Delete the "Type:: " line
         await editor.edit(editBuilder => {
-            editBuilder.delete(deleteRange);
+            editBuilder.delete(line.rangeIncludingLineBreak);
         });
 
-        // Step 2: Insert the new title line (e.g., (Book)).
-        // The position for insertion is where the trigger was, as it's now deleted.
+        // Insert the property lines at the line where "Type:: " was
         await editor.edit(editBuilder => {
-            editBuilder.insert(new vscode.Position(line.lineNumber, atSymbolIndex), newTitleLineContent);
+            editBuilder.insert(new vscode.Position(triggerLineNumber, 0), propertiesText + '\n');
         });
 
-        // Step 3: Insert the property lines.
-        // The insertion point is at the end of the newly inserted title line.
-        const titleLineEnd = new vscode.Position(line.lineNumber, newTitleLineContent.length);
-        await editor.edit(editBuilder => {
-            editBuilder.insert(titleLineEnd, propertiesText);
-        });
-
-        // Reposition the cursor to the end of the newly inserted title line.
-        const newCursorPosition = new vscode.Position(line.lineNumber, newTitleLineContent.length);
+        // Position the cursor in the value section of the second line (the line immediately following the Type:: line)
+        // This means the first inserted property line.
+        const firstPropertyLine = editor.document.lineAt(triggerLineNumber);
+        const firstPropertyKeyValueMatch = firstPropertyLine.text.match(/^\s*(\S.*?)::\s*(.*)$/);
+        let newCursorCharacter = firstPropertyLine.firstNonWhitespaceCharacterIndex;
+        if (firstPropertyKeyValueMatch && firstPropertyKeyValueMatch[1]) {
+            newCursorCharacter = firstPropertyLine.text.indexOf('::') + 3; // After ":: "
+        }
+        const newCursorPosition = new vscode.Position(triggerLineNumber, newCursorCharacter);
         editor.selection = new vscode.Selection(newCursorPosition, newCursorPosition);
     });
 }

@@ -33,12 +33,6 @@ export function isExcludedLine(line: vscode.TextLine): boolean {
         return true;
     }
 
-    // Regex for the typed node trigger (e.g., `@TypeName`). This prevents decoration
-    // while the user is typing the trigger.
-    const typedNodeTriggerRegex = /^\s*@\w*$/;
-    if (typedNodeTriggerRegex.test(text)) {
-        return true;
-    }
 
     return false;
 }

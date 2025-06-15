@@ -3,6 +3,7 @@ import { ExtensionState } from '../state/extensionState';
 import { BlockNode } from '../document/blockNode';
 import { findTypedNodeParent } from '../utils/nodeUtils';
 import { getBulletFromLine } from '../utils/bulletPointUtils';
+import { expandTemplateCommand } from './expandTemplate'; // Import the command
 
 /**
  * Provides the logic for the `pointblank.handleEnterKey` command, overriding the default
@@ -29,7 +30,7 @@ export class EnterKeyHandler {
         const documentModel = this._extensionState.getDocumentModel(document.uri.toString());
 
         if (!documentModel) {
-            await vscode.commands.executeCommand('type', { text: '\n' });
+            await vscode.commands.executeCommand('default:type', { text: '\n' });
             return;
         }
 
@@ -45,8 +46,20 @@ export class EnterKeyHandler {
             });
         }
 
-        let currentBlockNode = documentModel.documentTree.getNodeAtLine(position.line);
         const currentLine = document.lineAt(position.line);
+        // Check for "Type:: " trigger for inline template expansion
+        const typeTriggerRegex = /^\s*Type::\s*(\S.*)$/;
+        const typeMatch = currentLine.text.match(typeTriggerRegex);
+
+        if (typeMatch) {
+            const typeName = typeMatch[1].trim();
+            // Execute the command to expand the template, passing the current line number
+            // and the document model for programmatic edits.
+            await expandTemplateCommand(typeName, documentModel, position.line);
+            return; // Handled by template expansion
+        }
+
+        let currentBlockNode = documentModel.documentTree.getNodeAtLine(position.line);
 
 
         // --- Just-in-Time Re-parse for Stale Tree after Template Insertion ---
@@ -74,7 +87,7 @@ export class EnterKeyHandler {
         // If for some reason the current line is not found in the parsed tree,
         // fall back to default newline behavior. This should ideally not happen.
         if (!currentBlockNode) {
-            await vscode.commands.executeCommand('type', { text: '\n' });
+            await vscode.commands.executeCommand('default:type', { text: '\n' });
             return;
         }
 
@@ -108,7 +121,7 @@ export class EnterKeyHandler {
             await this.insertBulletPointAndMoveText(editor, position, document);
         } else {
             // If at the end of the line, just insert a newline.
-            await vscode.commands.executeCommand('type', { text: '\n' });
+            await vscode.commands.executeCommand('default:type', { text: '\n' });
         }
     }
 

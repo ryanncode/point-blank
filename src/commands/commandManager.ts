@@ -90,6 +90,12 @@ export class CommandManager {
             const line = editor.document.lineAt(position.line);
             const typedChar = args.text;
 
+            // If the typed character is a newline, delegate to our custom Enter key handler.
+            if (typedChar === '\n' || typedChar === '\r') {
+                await vscode.commands.executeCommand('pointblank.handleEnterKey');
+                return;
+            }
+
             // Check if the user is typing '[[', especially at the beginning of a line after a bullet.
             // This is a specific trigger for Foam's backlink completion.
             if (typedChar === '[' && position.character > 0 && line.text.charAt(position.character - 1) === '[') {
@@ -111,7 +117,7 @@ export class CommandManager {
             // Scenario 1: Auto-insert bullet on empty line if not already a markdown prefix
             if (typedChar.length === 1 && !typedChar.includes('\n') && !typedChar.includes('\r')) {
                 if (line.text.trim().length === 0 && position.character === line.firstNonWhitespaceCharacterIndex) {
-                    const markdownPrefixRegex = /^\s*([\*\+\-@]|>|#{1,6}|\d+[\.\)])/;
+                    const markdownPrefixRegex = /^\s*([\*\+\-]|>|#{1,6}|\d+[\.\)])/;
                     // Only insert a bullet if the typed character is NOT a markdown prefix.
                     // This allows VS Code's default 'type' command to handle markdown prefixes like '[[',
                     // ensuring interoperability with other extensions like Foam.
