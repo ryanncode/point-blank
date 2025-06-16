@@ -4,7 +4,7 @@
 :root {
     --background-color: #22272e; /* Dark background */
     --text-color: #adbac7; /* Light grey text */
-    --primary-color: #539bf5; /* Blue for links/accents */
+    --primary-color: #6a93cb; /* Softer blue for links/accents */
     --secondary-text-color: #808080; /* Blockquote/secondary text */
     --border-color: #444c56; /* Subtle border for elements */
     --header-bg: #2d333b; /* Slightly lighter dark for header */
@@ -53,7 +53,7 @@ nav ul li a {
 }
 
 nav ul li a:hover {
-    color: #c8e1ff; /* Lighter blue on hover */
+    color: #9ec2f0; /* Even lighter blue on hover */
 }
 
 main {

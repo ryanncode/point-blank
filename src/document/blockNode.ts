@@ -32,6 +32,11 @@ export class BlockNode {
     public readonly bulletType: 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'default' | 'none' | 'atSign';
     public readonly bulletRange?: vscode.Range;
 
+    // New header properties
+    public readonly isHeader: boolean;
+    public readonly headerLevel?: number;
+    public readonly headerText?: string;
+
     // Hierarchy properties
     public readonly parent?: BlockNode;
     public readonly children: readonly BlockNode[];
@@ -52,13 +57,16 @@ export class BlockNode {
         this.children = children;
 
         // Perform all parsing upon construction to ensure immutability.
-        const { isKeyValue, keyValue, isTypedNode, type, typedNodeRange, isCodeBlockDelimiter } = this.parseLineContent();
+        const { isKeyValue, keyValue, isTypedNode, type, typedNodeRange, isCodeBlockDelimiter, isHeader, headerLevel, headerText } = this.parseLineContent();
         this.isKeyValue = isKeyValue;
         this.keyValue = keyValue;
         this.isTypedNode = isTypedNode;
         this.type = type;
         this.typedNodeRange = typedNodeRange;
         this.isCodeBlockDelimiter = isCodeBlockDelimiter;
+        this.isHeader = isHeader;
+        this.headerLevel = headerLevel;
+        this.headerText = headerText;
 
         const { bulletType, bulletRange } = determineBulletType(this.text, this.indent, this.isCodeBlockDelimiter, this.isExcluded, this.lineNumber);
         this.bulletType = bulletType;
@@ -75,7 +83,15 @@ export class BlockNode {
 
         // Check for code block delimiter: ```
         if (trimmedText.startsWith('```')) {
-            return { isCodeBlockDelimiter: true, isKeyValue: false, isTypedNode: false };
+            return { isCodeBlockDelimiter: true, isKeyValue: false, isTypedNode: false, isHeader: false, headerLevel: undefined, headerText: undefined };
+        }
+
+        // Check for markdown headers: #, ##, etc.
+        const headerMatch = trimmedText.match(/^(#+)\s+(.*)/);
+        if (headerMatch) {
+            const level = headerMatch[1].length;
+            const text = headerMatch[2].trim();
+            return { isHeader: true, headerLevel: level, headerText: text, isCodeBlockDelimiter: false, isKeyValue: false, isTypedNode: false };
         }
 
         // Check for Key:: Value pattern.
@@ -94,7 +110,7 @@ export class BlockNode {
                 keyRange: keyRange,
                 valueRange: valuePart ? new vscode.Range(this.lineNumber, keyStartChar + keyPart.length + 1, this.lineNumber, keyStartChar + keyPart.length + 1 + valuePart.length) : undefined
             };
-            return { isKeyValue: true, keyValue, isTypedNode: false, isCodeBlockDelimiter: false };
+            return { isKeyValue: true, keyValue, isTypedNode: false, isCodeBlockDelimiter: false, isHeader: false, headerLevel: undefined, headerText: undefined };
         }
 
         // Check for Typed Node pattern: (TypeName)
@@ -104,10 +120,10 @@ export class BlockNode {
             const startIndex = this.text.indexOf(`(${type})`);
             const endIndex = startIndex + type.length + 2; // +2 for parentheses
             const typedNodeRange = new vscode.Range(this.lineNumber, startIndex, this.lineNumber, endIndex);
-            return { isTypedNode: true, type, typedNodeRange, isKeyValue: false, isCodeBlockDelimiter: false };
+            return { isTypedNode: true, type, typedNodeRange, isKeyValue: false, isCodeBlockDelimiter: false, isHeader: false, headerLevel: undefined, headerText: undefined };
         }
 
-        return { isKeyValue: false, isTypedNode: false, isCodeBlockDelimiter: false };
+        return { isKeyValue: false, isTypedNode: false, isCodeBlockDelimiter: false, isHeader: false, headerLevel: undefined, headerText: undefined };
     }
 
     /**
@@ -157,7 +173,10 @@ export class BlockNode {
         if (this.text !== otherNode.text ||
             this.bulletType !== otherNode.bulletType ||
             this.isKeyValue !== otherNode.isKeyValue ||
-            this.isTypedNode !== otherNode.isTypedNode) {
+            this.isTypedNode !== otherNode.isTypedNode ||
+            this.isHeader !== otherNode.isHeader ||
+            this.headerLevel !== otherNode.headerLevel ||
+            this.headerText !== otherNode.headerText) {
             return true;
         }
 

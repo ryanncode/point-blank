@@ -5,6 +5,7 @@ import { DocumentModel } from '../document/documentModel';
 import { DocumentTree } from '../document/documentTree';
 import { BlockAggregator } from '../document/blockAggregator';
 import { TypedBlock } from '../document/typedBlock';
+import { BlockNode } from '../document/blockNode';
 
 interface Condition {
     key: string;
@@ -141,7 +142,6 @@ export class QueryService {
             });
         } else { // BLOCKS
             return results.map(item => {
-                // Format as link to file with line number
                 let basePath = '';
                 if (queryParts.scope === 'this.folder' && this._extensionState.activeEditor) {
                     basePath = path.dirname(this._extensionState.activeEditor.document.uri.fsPath);
@@ -150,10 +150,53 @@ export class QueryService {
                 }
 
                 const relativePath = basePath ? path.relative(basePath, item.uri.fsPath) : item.uri.fsPath;
-                // VS Code's URI fragment for line numbers is #L<line_number>
-                return `${relativePath}:${item.startLine! + 1}`; // +1 because VS Code lines are 1-based
+
+                // Get the DocumentModel for the current item's URI
+                const documentModel = this._extensionState.getDocumentModel(item.uri.toString());
+                let headerLink = '';
+
+                if (documentModel && documentModel.documentTree) {
+                    const nearestHeader = this._findNearestHeader(documentModel.documentTree, item.startLine!);
+                    if (nearestHeader && nearestHeader.headerText) {
+                        headerLink = `#${this._formatHeaderForLink(nearestHeader.headerText)}`;
+                    }
+                }
+                
+                // Format as [[relative/path#formatted-header]] or [[relative/path]] if no header
+                return `${relativePath}${headerLink}`;
             });
         }
+    }
+
+    /**
+     * Finds the nearest markdown header above a given line number in a document tree.
+     * @param documentTree The DocumentTree to search within.
+     * @param blockStartLine The starting line number of the block.
+     * @returns The BlockNode representing the nearest header, or undefined if none is found.
+     */
+    private _findNearestHeader(documentTree: DocumentTree, blockStartLine: number): BlockNode | undefined {
+        const allNodes = documentTree.getAllNodesFlat();
+        // Iterate backwards from the block's start line to find the nearest header
+        for (let i = blockStartLine - 1; i >= 0; i--) {
+            const node = allNodes[i];
+            if (node && node.isHeader) {
+                return node;
+            }
+        }
+        return undefined;
+    }
+
+    /**
+     * Formats a header text into a URL-friendly slug for markdown links.
+     * Converts to lowercase, replaces spaces with hyphens, and removes non-alphanumeric characters.
+     * @param headerText The raw header text.
+     * @returns The formatted header slug.
+     */
+    private _formatHeaderForLink(headerText: string): string {
+        return headerText
+            .toLowerCase()
+            .replace(/\s+/g, '-') // Replace spaces with hyphens
+            .replace(/[^a-z0-9-]/g, ''); // Remove non-alphanumeric characters except hyphens
     }
 
     /**
