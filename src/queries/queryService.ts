@@ -126,13 +126,30 @@ export class QueryService {
 
         // Format results based on source
         if (queryParts.source === 'FILES') {
-            return results.map(item => item.uri.fsPath);
+            let basePath = '';
+            if (queryParts.scope === 'this.folder' && this._extensionState.activeEditor) {
+                basePath = path.dirname(this._extensionState.activeEditor.document.uri.fsPath);
+            } else if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0) {
+                basePath = vscode.workspace.workspaceFolders[0].uri.fsPath;
+            }
+
+            return results.map(item => {
+                if (basePath) {
+                    return path.relative(basePath, item.uri.fsPath);
+                }
+                return item.uri.fsPath;
+            });
         } else { // BLOCKS
             return results.map(item => {
                 // Format as link to file with line number
-                const relativePath = vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders[0]
-                    ? path.relative(vscode.workspace.workspaceFolders[0].uri.fsPath, item.uri.fsPath)
-                    : item.uri.fsPath;
+                let basePath = '';
+                if (queryParts.scope === 'this.folder' && this._extensionState.activeEditor) {
+                    basePath = path.dirname(this._extensionState.activeEditor.document.uri.fsPath);
+                } else if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0) {
+                    basePath = vscode.workspace.workspaceFolders[0].uri.fsPath;
+                }
+
+                const relativePath = basePath ? path.relative(basePath, item.uri.fsPath) : item.uri.fsPath;
                 // VS Code's URI fragment for line numbers is #L<line_number>
                 return `${relativePath}:${item.startLine! + 1}`; // +1 because VS Code lines are 1-based
             });
