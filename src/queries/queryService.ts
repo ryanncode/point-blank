@@ -15,7 +15,7 @@ interface Condition {
 
 interface Query {
     source: 'FILES' | 'BLOCKS';
-    scope: 'this.file' | 'this.folder' | 'workspace'; // Default to workspace
+    scope: string; // Can be 'this.file', 'this.folder', 'workspace', or a path string
     whereConjunction?: 'AND' | 'OR'; // To indicate how multiple conditions are joined
     whereConditions: Condition[];
     sortKey?: string;
@@ -42,19 +42,54 @@ export class QueryService {
         let urisToProcess: vscode.Uri[] = [];
 
         // Determine URIs based on scope
+        const activeEditor = this._extensionState.activeEditor;
+        let baseUri: vscode.Uri | undefined;
+
+        if (activeEditor) {
+            baseUri = activeEditor.document.uri;
+        } else if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0) {
+            baseUri = vscode.workspace.workspaceFolders[0].uri;
+        }
+
+        if (!baseUri) {
+            console.warn('No active editor or workspace folder found to determine base URI for query scope.');
+            return [];
+        }
+
         if (queryParts.scope === 'this.file') {
-            const activeEditor = this._extensionState.activeEditor;
-            if (activeEditor) {
-                urisToProcess.push(activeEditor.document.uri);
-            }
+            urisToProcess.push(baseUri);
         } else if (queryParts.scope === 'this.folder') {
-            const activeEditor = this._extensionState.activeEditor;
-            if (activeEditor) {
-                const folderUri = vscode.Uri.file(path.dirname(activeEditor.document.uri.fsPath));
-                urisToProcess = await vscode.workspace.findFiles(new vscode.RelativePattern(folderUri, '**/*.md'), '{**/node_modules/**,**/.vscode/templates/**}');
-            }
-        } else { // workspace
+            const folderUri = vscode.Uri.file(path.dirname(baseUri.fsPath));
+            urisToProcess = await vscode.workspace.findFiles(new vscode.RelativePattern(folderUri, '**/*.md'), '{**/node_modules/**,**/.vscode/templates/**}');
+        } else if (queryParts.scope === 'workspace') {
             urisToProcess = await vscode.workspace.findFiles('**/*.md', '{**/node_modules/**,**/.vscode/templates/**}');
+        } else {
+            // Handle path-based scope
+            const currentFileDir = path.dirname(baseUri.fsPath);
+            const resolvedPath = path.resolve(currentFileDir, queryParts.scope);
+            const scopeUri = vscode.Uri.file(resolvedPath);
+
+            // Determine if it's a file or a directory
+            let stat;
+            try {
+                stat = await vscode.workspace.fs.stat(scopeUri);
+            } catch (e) {
+                console.warn(`Path not found or accessible: ${scopeUri.fsPath}`);
+                return []; // Path does not exist
+            }
+
+            if (stat.type === vscode.FileType.File) {
+                // If it's a file, add it directly
+                if (scopeUri.fsPath.endsWith('.md')) {
+                    urisToProcess.push(scopeUri);
+                }
+            } else if (stat.type === vscode.FileType.Directory) {
+                // If it's a directory, find all markdown files within it
+                urisToProcess = await vscode.workspace.findFiles(new vscode.RelativePattern(scopeUri, '**/*.md'), '{**/node_modules/**,**/.vscode/templates/**}');
+            } else {
+                console.warn(`Unsupported scope type: ${scopeUri.fsPath}`);
+                return [];
+            }
         }
 
         if (queryParts.source === 'FILES') {
@@ -218,7 +253,8 @@ export class QueryService {
      *          - `sortOrder`: Optional. 'ASC' or 'DESC' for sorting order.
      */
     public parseQuery(queryString: string): Query | null {
-        const queryRegex = /^LIST FROM\s+(FILES|BLOCKS)(?:\s+IN\s+(this\.file|this\.folder|workspace))?(?:\s+WHERE\s+(.*?))?(?:\s+SORT BY\s+([\w\s]+)\s+(ASC|DESC))?$/i;
+        // Updated regex to allow quoted paths for the IN clause
+        const queryRegex = /^LIST FROM\s+(FILES|BLOCKS)(?:\s+IN\s+("(?:[^"\\]|\\.)*"|this\.file|this\.folder|workspace))?(?:\s+WHERE\s+(.*?))?(?:\s+SORT BY\s+([\w\s]+)\s+(ASC|DESC))?$/i;
         const match = queryString.match(queryRegex);
 
         if (!match) {
@@ -226,7 +262,11 @@ export class QueryService {
         }
 
         const source = match[1].toUpperCase() as 'FILES' | 'BLOCKS';
-        const scope = (match[2] || 'workspace') as 'this.file' | 'this.folder' | 'workspace';
+        let scope = match[2] || 'workspace';
+        // Remove quotes from scope if it's a quoted path
+        if (scope.startsWith('"') && scope.endsWith('"')) {
+            scope = scope.substring(1, scope.length - 1);
+        }
         const whereClauseString = match[3];
         const sortKey = match[4];
         const sortOrder = match[5] ? (match[5].toUpperCase() as 'ASC' | 'DESC') : undefined;
