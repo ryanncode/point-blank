@@ -288,6 +288,14 @@ export class CommandManager {
                 await editor.edit(editBuilder => {
                     editBuilder.replace(rangeToReplace, newQueryBlock);
                 });
+
+                // Set the cursor position to the start of the query comment line
+                let newQueryCommentLineNumber = resultsStartLine;
+                if (newFormattedResults) {
+                    newQueryCommentLineNumber += newFormattedResults.split('\n').length;
+                }
+                const newPosition = new vscode.Position(newQueryCommentLineNumber, 0);
+                editor.selection = new vscode.Selection(newPosition, newPosition);
             })
         );
     }
@@ -332,6 +340,9 @@ export class CommandManager {
      */
     private _formatQueryBlock(formattedResults: string, queryString: string): string {
         const queryComment = `<!-- pointblank:query ${queryString} -->`;
-        return `${formattedResults}\n${queryComment}\n`;
+        if (formattedResults) {
+            return `${formattedResults}\n${queryComment}\n`;
+        }
+        return `${queryComment}\n`;
     }
 }
