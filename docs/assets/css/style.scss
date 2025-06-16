@@ -27,6 +27,10 @@ header {
     padding: 1.5em 20px; /* Added horizontal padding */
     text-align: center;
     border-bottom: 1px solid var(--border-color);
+    /* For mobile, allow flex items to wrap */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 header h1 {
@@ -38,6 +42,7 @@ nav ul {
     padding: 0;
     list-style: none;
     display: flex;
+    flex-wrap: wrap; /* Allow items to wrap to the next line */
     justify-content: center;
     margin-top: 1.5em; /* Increased margin to prevent overlap */
 }
@@ -52,6 +57,7 @@ main {
     background-color: #2d333b; /* Slightly lighter dark for content area */
     border-radius: 6px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    margin: 20px; /* Add margin to main content for smaller screens */
 }
 
 section {
@@ -116,4 +122,49 @@ footer {
 .container {
     max-width: 1000px;
     margin: 0 auto;
+    padding: 0 15px; /* Add horizontal padding for smaller screens */
+}
+
+/* Media queries for responsiveness */
+@media (max-width: 768px) {
+    header {
+        padding: 1em 15px; /* Adjust header padding for smaller screens */
+    }
+
+    header h1 {
+        font-size: 1.8em;
+    }
+
+    nav ul {
+        flex-direction: column; /* Stack navigation items vertically */
+        margin-top: 1em;
+    }
+
+    nav ul li {
+        margin: 10px 0; /* Adjust margin for stacked items */
+    }
+
+    main {
+        padding: 20px 15px; /* Adjust main content padding for smaller screens */
+        margin: 15px;
+    }
+
+    .container {
+        padding: 0 10px; /* Further reduce container padding on very small screens */
+    }
+}
+
+@media (max-width: 480px) {
+    header h1 {
+        font-size: 1.5em;
+    }
+
+    nav ul li {
+        margin: 8px 0;
+    }
+
+    main {
+        padding: 15px 10px;
+        margin: 10px;
+    }
 }

@@ -2,6 +2,16 @@
 
 All notable changes to the "pointblank" extension will be documented in this file.
 
+## [6.1.0] - 2025-06-15
+
+### Added
+- **Powerful Inline Query Language**: A major new feature that allows you to search for and display information directly within your notes.
+    - Supports `LIST` (wiki-style links) and `TRANSCLUDE` (embedded content) actions.
+    - Query from `FILES` (metadata) or `BLOCKS` (inline content).
+    - Filter results with a `WHERE` clause supporting `AND`/`OR` and multiple operators (`=`, `!=`, `>`, `<`, `::`).
+    - Sort results with `SORT BY`.
+    - Define search scope with `IN` clause, supporting `this.file`, `this.folder`, `workspace`, and now **relative paths** (e.g., `IN "./notes/"`).
+
 ## [0.6.0] - 2025-06-15
 ### Changed
 - Major refactor of the template system. Templates are now defined by a `Type::` property and stored in `.vscode/templates`.

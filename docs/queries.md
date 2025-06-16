@@ -117,3 +117,37 @@ Here are several examples demonstrating the use of the query language:
 11. **List all high-priority, incomplete "Task" blocks in the current folder, sorted by `DueDate`:**
     ```
     LIST FROM BLOCKS IN this.folder WHERE Type = "Task" AND Priority = "High" AND Status != "Done" SORT BY DueDate ASC
+
+## Running Queries
+
+There are two primary ways to execute queries in Point Blank: manually writing query blocks or using commands from the Command Palette.
+
+### Manual Workflow
+
+You can write queries directly in your markdown files. The query engine identifies queries by a special HTML comment.
+
+1.  **Write the Query:** Type your query inside a comment block like this:
+    ```markdown
+    <!-- pointblank:query LIST FROM BLOCKS WHERE Type = "Task" AND Status = "Pending" -->
+    ```
+2.  **Execute the Query:** Place your cursor anywhere in the file and run the **`Point Blank: Update Query`** command from the VS Code Command Palette (`Ctrl+Shift+P`). The extension will find the nearest query block (searching down from the cursor), execute it, and insert the results directly above the comment block.
+
+### Using Commands
+
+Point Blank provides commands to simplify the process of creating and updating queries.
+
+*   **`Point Blank: Insert Query by Type`** (`pointblank.insertTypeQuery`)
+    *   This command will prompt you to enter a `Type` name (e.g., "Task", "Note").
+    *   It will then insert a complete query block into the editor, ready to be executed.
+    *   Example Query Inserted: `LIST FROM BLOCKS WHERE Type::Task`
+
+*   **`Point Blank: Update Query`** (`pointblank.updateTypeQuery`)
+    *   This command searches for the nearest query block below your cursor's current position.
+    *   It re-runs the query and replaces the old results with the new ones. This is useful for refreshing a list after you've made changes to your notes.
+
+## Command Reference
+
+| Command | ID | Description |
+| :--- | :--- | :--- |
+| Insert Query by Type | `pointblank.insertTypeQuery` | Prompts for a type and inserts a new query block. |
+| Update Query | `pointblank.updateTypeQuery` | Updates the results of the nearest query block. |
