@@ -11,6 +11,13 @@ export class ExtensionState {
     private _activeEditor?: vscode.TextEditor;
     private _documentModels: Map<string, DocumentModel> = new Map();
 
+    /**
+     * Returns a Map of all active `DocumentModel`s, keyed by their URI.
+     */
+    public get documentModels(): ReadonlyMap<string, DocumentModel> {
+        return this._documentModels;
+    }
+
     private constructor() {
         // Private constructor ensures singleton pattern.
     }

@@ -17,7 +17,7 @@ export class CommandManager {
 
     constructor(extensionState: ExtensionState) {
         this.extensionState = extensionState;
-        this.queryService = new QueryService();
+        this.queryService = new QueryService(extensionState);
     }
 
     /**
@@ -230,9 +230,14 @@ export class CommandManager {
                     return; // User cancelled
                 }
 
-                const queryString = `LIST FROM Type:: ${typeName}`;
-                const files = await this.queryService.executeQuery(queryString);
-                const formattedResults = files.map(file => `- [[${path.relative(vscode.workspace.workspaceFolders![0].uri.fsPath, file)}]]`).join('\n');
+                const queryString = `LIST FROM BLOCKS WHERE Type::${typeName}`;
+                const parsedQuery = this.queryService.parseQuery(queryString);
+                if (!parsedQuery) {
+                    vscode.window.showErrorMessage('Failed to parse query for insertTypeQuery.');
+                    return;
+                }
+                const results = await this.queryService.executeQuery(parsedQuery);
+                const formattedResults = results.map(item => `- [[${item}]]`).join('\n');
                 const queryBlock = this._formatQueryBlock(formattedResults, queryString);
 
                 const snippet = new vscode.SnippetString(queryBlock);
@@ -262,8 +267,13 @@ export class CommandManager {
                     return;
                 }
 
-                const files = await this.queryService.executeQuery(fullQueryString);
-                const newFormattedResults = files.map(file => `- [[${path.relative(vscode.workspace.workspaceFolders![0].uri.fsPath, file)}]]`).join('\n');
+                const parsedQuery = this.queryService.parseQuery(fullQueryString);
+                if (!parsedQuery) {
+                    vscode.window.showErrorMessage('Failed to parse query for updateTypeQuery.');
+                    return;
+                }
+                const results = await this.queryService.executeQuery(parsedQuery);
+                const newFormattedResults = results.map(item => `- [[${item}]]`).join('\n');
                 const newQueryBlock = this._formatQueryBlock(newFormattedResults, fullQueryString);
 
                 const queryCommentStartLine = queryCommentLine.lineNumber;

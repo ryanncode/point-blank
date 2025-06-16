@@ -18,10 +18,12 @@ export class DocumentModel {
     private _isParsing: boolean = false;
     private _onDidParseEventEmitter = new vscode.EventEmitter<void>();
     private _isBulkUpdating: boolean = false; // New flag for bulk updates
+    public readonly uri: vscode.Uri; // Add uri property
 
     constructor(document: vscode.TextDocument) {
         this._document = document;
         this._parser = new DocumentParser();
+        this.uri = document.uri; // Initialize uri property
 
         // Perform an initial full parse of the document upon creation.
         this.performFullParse(this._document);

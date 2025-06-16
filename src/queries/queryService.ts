@@ -1,5 +1,11 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import { ExtensionState } from '../state/extensionState';
+import { DocumentModel } from '../document/documentModel';
+import { DocumentTree } from '../document/documentTree';
+import { BlockAggregator } from '../document/blockAggregator';
+import { TypedBlock } from '../document/typedBlock';
+
 interface Condition {
     key: string;
     operator?: '::' | '!=' | '>' | '<' | 'AND' | 'OR';
@@ -7,7 +13,8 @@ interface Condition {
 }
 
 interface Query {
-    type: string;
+    source: 'FILES' | 'BLOCKS';
+    scope: 'this.file' | 'this.folder' | 'workspace'; // Default to workspace
     whereConjunction?: 'AND' | 'OR'; // To indicate how multiple conditions are joined
     whereConditions: Condition[];
     sortKey?: string;
@@ -15,35 +22,87 @@ interface Query {
 }
 
 export class QueryService {
-    constructor() {}
+    private _extensionState: ExtensionState;
+    private _blockAggregator: BlockAggregator;
+
+    constructor(extensionState: ExtensionState) {
+        this._extensionState = extensionState;
+        this._blockAggregator = new BlockAggregator();
+    }
 
     /**
-     * Finds all Markdown files in the workspace that contain a specific Type:: declaration.
-     * @param typeName The type name to search for (e.g., "Task", "Note").
-     * @returns A promise that resolves to an array of absolute file paths matching the type.
+     * Executes a parsed query to find relevant files or blocks.
+     * @param queryParts The parsed Query object.
+     * @returns A promise that resolves to an array of formatted strings (file paths or block links).
      */
-    public async executeQuery(queryString: string): Promise<string[]> {
-        const queryParts: Query | null = this.parseQuery(queryString);
-        if (!queryParts || !queryParts.type) {
-            return []; // Invalid query
+    public async executeQuery(queryParts: Query): Promise<string[]> {
+        let results: { uri: vscode.Uri; properties: Map<string, string>; startLine?: number }[] = [];
+
+        let urisToProcess: vscode.Uri[] = [];
+
+        // Determine URIs based on scope
+        if (queryParts.scope === 'this.file') {
+            const activeEditor = this._extensionState.activeEditor;
+            if (activeEditor) {
+                urisToProcess.push(activeEditor.document.uri);
+            }
+        } else if (queryParts.scope === 'this.folder') {
+            const activeEditor = this._extensionState.activeEditor;
+            if (activeEditor) {
+                const folderUri = vscode.Uri.file(path.dirname(activeEditor.document.uri.fsPath));
+                urisToProcess = await vscode.workspace.findFiles(new vscode.RelativePattern(folderUri, '**/*.md'), '{**/node_modules/**,**/.vscode/templates/**}');
+            }
+        } else { // workspace
+            urisToProcess = await vscode.workspace.findFiles('**/*.md', '{**/node_modules/**,**/.vscode/templates/**}');
         }
 
-        const typeName = queryParts.type;
-        let files = await vscode.workspace.findFiles('**/*.md', '{**/node_modules/**,**/.vscode/templates/**}');
-
-        let results: { uri: vscode.Uri; properties: Map<string, string> }[] = [];
-
-        for (const uri of files) {
-            try {
-                const document = await vscode.workspace.openTextDocument(uri);
-                const content = document.getText();
-                const properties = this.extractProperties(content);
-
-                if (properties.get('Type') === typeName) {
+        if (queryParts.source === 'FILES') {
+            for (const uri of urisToProcess) {
+                try {
+                    const document = await vscode.workspace.openTextDocument(uri);
+                    const content = document.getText();
+                    const properties = this.extractProperties(content);
                     results.push({ uri, properties });
+                } catch (error) {
+                    console.error(`Error reading file ${uri.fsPath}: ${error}`);
                 }
-            } catch (error) {
-                console.error(`Error reading file ${uri.fsPath}: ${error}`);
+            }
+        } else if (queryParts.source === 'BLOCKS') {
+            for (const uri of urisToProcess) {
+                let documentModel = this._extensionState.getDocumentModel(uri.toString());
+
+                if (!documentModel) {
+                    // Document not open, open it and wait for its model to be ready
+                    try {
+                        const document = await vscode.workspace.openTextDocument(uri);
+                        // The onDidOpenTextDocument listener in extension.ts should create the model.
+                        // We need to wait for it to be added to extensionState and parsed.
+                        documentModel = this._extensionState.getDocumentModel(uri.toString());
+                        if (!documentModel) {
+                            console.warn(`DocumentModel for ${uri.fsPath} not found after opening. Skipping.`);
+                            continue;
+                        }
+                        // Wait for the document model to finish its initial parse
+                        if (documentModel.isParsing) {
+                            await new Promise<void>(resolve => {
+                                const disposable = documentModel!.onDidParse(() => {
+                                    disposable.dispose();
+                                    resolve();
+                                });
+                            });
+                        }
+                    } catch (error) {
+                        console.error(`Error opening document ${uri.fsPath}: ${error}`);
+                        continue;
+                    }
+                }
+
+                if (documentModel && documentModel.documentTree) {
+                    const typedBlocks = this._blockAggregator.findTypedBlocks(documentModel.documentTree);
+                    for (const block of typedBlocks) {
+                        results.push({ uri: block.uri, properties: block.properties, startLine: block.startLine });
+                    }
+                }
             }
         }
 
@@ -65,7 +124,19 @@ export class QueryService {
             });
         }
 
-        return results.map(item => item.uri.fsPath);
+        // Format results based on source
+        if (queryParts.source === 'FILES') {
+            return results.map(item => item.uri.fsPath);
+        } else { // BLOCKS
+            return results.map(item => {
+                // Format as link to file with line number
+                const relativePath = vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders[0]
+                    ? path.relative(vscode.workspace.workspaceFolders[0].uri.fsPath, item.uri.fsPath)
+                    : item.uri.fsPath;
+                // VS Code's URI fragment for line numbers is #L<line_number>
+                return `${relativePath}:${item.startLine! + 1}`; // +1 because VS Code lines are 1-based
+            });
+        }
     }
 
     /**
@@ -76,7 +147,8 @@ export class QueryService {
      * @param queryString The raw query string to parse.
      * @returns A `Query` object representing the parsed query, or `null` if the query string is invalid.
      *          The `Query` object has the following structure:
-     *          - `type`: The main type being queried (e.g., "Task", "Note").
+     *          - `source`: 'FILES' or 'BLOCKS' indicating where to query from.
+     *          - `scope`: 'this.file', 'this.folder', or 'workspace' indicating the query scope. Defaults to 'workspace'.
      *          - `whereConjunction`: Optional. 'AND' or 'OR' if multiple conditions are present in the WHERE clause.
      *          - `whereConditions`: An array of `Condition` objects. Each `Condition` has:
      *              - `key`: The property key to filter by.
@@ -85,18 +157,19 @@ export class QueryService {
      *          - `sortKey`: Optional. The property key to sort results by.
      *          - `sortOrder`: Optional. 'ASC' or 'DESC' for sorting order.
      */
-    private parseQuery(queryString: string): Query | null {
-        const queryRegex = /^LIST FROM Type::\s*(\w+)(?:\s+WHERE\s+(.*?))?(?:\s+SORT BY\s+([\w\s]+)\s+(ASC|DESC))?$/;
+    public parseQuery(queryString: string): Query | null {
+        const queryRegex = /^LIST FROM\s+(FILES|BLOCKS)(?:\s+IN\s+(this\.file|this\.folder|workspace))?(?:\s+WHERE\s+(.*?))?(?:\s+SORT BY\s+([\w\s]+)\s+(ASC|DESC))?$/i;
         const match = queryString.match(queryRegex);
 
         if (!match) {
             return null; // Invalid query format or order
         }
 
-        const type = match[1];
-        const whereClauseString = match[2];
-        const sortKey = match[3];
-        const sortOrder = match[4] ? (match[4].toUpperCase() as 'ASC' | 'DESC') : undefined;
+        const source = match[1].toUpperCase() as 'FILES' | 'BLOCKS';
+        const scope = (match[2] || 'workspace') as 'this.file' | 'this.folder' | 'workspace';
+        const whereClauseString = match[3];
+        const sortKey = match[4];
+        const sortOrder = match[5] ? (match[5].toUpperCase() as 'ASC' | 'DESC') : undefined;
 
         let whereConditions: Condition[] = [];
         let whereConjunction: 'AND' | 'OR' | undefined;
@@ -113,7 +186,8 @@ export class QueryService {
         }
 
         return {
-            type: type,
+            source: source,
+            scope: scope,
             whereConjunction: whereConjunction,
             whereConditions: whereConditions,
             sortKey: sortKey,
