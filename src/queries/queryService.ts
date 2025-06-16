@@ -14,6 +14,7 @@ interface Condition {
 }
 
 interface Query {
+    action: 'LIST' | 'TRANSCLUDE'; // New property to specify the action
     source: 'FILES' | 'BLOCKS';
     scope: string; // Can be 'this.file', 'this.folder', 'workspace', or a path string
     whereConjunction?: 'AND' | 'OR'; // To indicate how multiple conditions are joined
@@ -160,8 +161,8 @@ export class QueryService {
             });
         }
 
-        // Format results based on source
-        if (queryParts.source === 'FILES') {
+        // Format results based on action and source
+        return results.map(item => {
             let basePath = '';
             if (queryParts.scope === 'this.folder' && this._extensionState.activeEditor) {
                 basePath = path.dirname(this._extensionState.activeEditor.document.uri.fsPath);
@@ -169,38 +170,27 @@ export class QueryService {
                 basePath = vscode.workspace.workspaceFolders[0].uri.fsPath;
             }
 
-            return results.map(item => {
-                if (basePath) {
-                    return path.relative(basePath, item.uri.fsPath);
-                }
-                return item.uri.fsPath;
-            });
-        } else { // BLOCKS
-            return results.map(item => {
-                let basePath = '';
-                if (queryParts.scope === 'this.folder' && this._extensionState.activeEditor) {
-                    basePath = path.dirname(this._extensionState.activeEditor.document.uri.fsPath);
-                } else if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0) {
-                    basePath = vscode.workspace.workspaceFolders[0].uri.fsPath;
-                }
+            const relativePath = basePath ? path.relative(basePath, item.uri.fsPath) : item.uri.fsPath;
 
-                const relativePath = basePath ? path.relative(basePath, item.uri.fsPath) : item.uri.fsPath;
-
-                // Get the DocumentModel for the current item's URI
+            // Generate the core link target (path + optional header)
+            let linkTarget = relativePath;
+            if (queryParts.source === 'BLOCKS') {
                 const documentModel = this._extensionState.getDocumentModel(item.uri.toString());
-                let headerLink = '';
-
                 if (documentModel && documentModel.documentTree) {
                     const nearestHeader = this._findNearestHeader(documentModel.documentTree, item.startLine!);
                     if (nearestHeader && nearestHeader.headerText) {
-                        headerLink = `#${this._formatHeaderForLink(nearestHeader.headerText)}`;
+                        linkTarget += `#${this._formatHeaderForLink(nearestHeader.headerText)}`;
                     }
                 }
-                
-                // Format as [[relative/path#formatted-header]] or [[relative/path]] if no header
-                return `${relativePath}${headerLink}`;
-            });
-        }
+            }
+
+            // Apply the final wrapper based on the action
+            if (queryParts.action === 'LIST') {
+                return `[[${linkTarget}]]`;
+            } else { // TRANSCLUDE
+                return `![[${linkTarget}]]`;
+            }
+        });
     }
 
     /**
@@ -253,23 +243,24 @@ export class QueryService {
      *          - `sortOrder`: Optional. 'ASC' or 'DESC' for sorting order.
      */
     public parseQuery(queryString: string): Query | null {
-        // Updated regex to allow quoted paths for the IN clause
-        const queryRegex = /^LIST FROM\s+(FILES|BLOCKS)(?:\s+IN\s+("(?:[^"\\]|\\.)*"|this\.file|this\.folder|workspace))?(?:\s+WHERE\s+(.*?))?(?:\s+SORT BY\s+([\w\s]+)\s+(ASC|DESC))?$/i;
+        // Updated regex to allow 'LIST' or 'TRANSCLUDE' as the action keyword and quoted paths for the IN clause
+        const queryRegex = /^(LIST|TRANSCLUDE)\s+FROM\s+(FILES|BLOCKS)(?:\s+IN\s+("(?:[^"\\]|\\.)*"|this\.file|this\.folder|workspace))?(?:\s+WHERE\s+(.*?))?(?:\s+SORT BY\s+([\w\s]+)\s+(ASC|DESC))?$/i;
         const match = queryString.match(queryRegex);
 
         if (!match) {
             return null; // Invalid query format or order
         }
 
-        const source = match[1].toUpperCase() as 'FILES' | 'BLOCKS';
-        let scope = match[2] || 'workspace';
+        const action = match[1].toUpperCase() as 'LIST' | 'TRANSCLUDE';
+        const source = match[2].toUpperCase() as 'FILES' | 'BLOCKS';
+        let scope = match[3] || 'workspace';
         // Remove quotes from scope if it's a quoted path
         if (scope.startsWith('"') && scope.endsWith('"')) {
             scope = scope.substring(1, scope.length - 1);
         }
-        const whereClauseString = match[3];
-        const sortKey = match[4];
-        const sortOrder = match[5] ? (match[5].toUpperCase() as 'ASC' | 'DESC') : undefined;
+        const whereClauseString = match[4];
+        const sortKey = match[5];
+        const sortOrder = match[6] ? (match[6].toUpperCase() as 'ASC' | 'DESC') : undefined;
 
         let whereConditions: Condition[] = [];
         let whereConjunction: 'AND' | 'OR' | undefined;
@@ -286,6 +277,7 @@ export class QueryService {
         }
 
         return {
+            action: action, // Assign the parsed action
             source: source,
             scope: scope,
             whereConjunction: whereConjunction,

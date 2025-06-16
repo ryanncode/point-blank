@@ -237,7 +237,9 @@ export class CommandManager {
                     return;
                 }
                 const results = await this.queryService.executeQuery(parsedQuery);
-                const formattedResults = results.map(item => `- [[${item}]]`).join('\n');
+                // The QueryService now returns fully formatted links (e.g., [[link]] or ![[link]])
+                // so we only need to prepend the list bullet.
+                const formattedResults = results.map(item => `- ${item}`).join('\n');
                 const queryBlock = this._formatQueryBlock(formattedResults, queryString);
 
                 const snippet = new vscode.SnippetString(queryBlock);
@@ -273,7 +275,9 @@ export class CommandManager {
                     return;
                 }
                 const results = await this.queryService.executeQuery(parsedQuery);
-                const newFormattedResults = results.map(item => `- [[${item}]]`).join('\n');
+                // The QueryService now returns fully formatted links (e.g., [[link]] or ![[link]])
+                // so we only need to prepend the list bullet.
+                const newFormattedResults = results.map(item => `- ${item}`).join('\n');
                 const newQueryBlock = this._formatQueryBlock(newFormattedResults, fullQueryString);
 
                 const queryCommentStartLine = queryCommentLine.lineNumber;
