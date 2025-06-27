@@ -13,3 +13,4 @@ Here is a list of commands available in the Point Blank VS Code extension:
 | `pointblank.unfocusMode` | Point Blank: Unfocus | `Alt+U` |
 | `pointblank.quickOpenFile` | Point Blank: Quick Open File from Template | `Alt+N` |
 | `pointblank.expandTemplate` | Point Blank: Expand Template Inline (triggered by `TypeName::`) | |
+| `pointblank.toggleAutoBullets` | Point Blank: Toggle Auto Bullets (enable/disable automatic bullet point insertion for new lines and pastes) | `Alt+B` |
