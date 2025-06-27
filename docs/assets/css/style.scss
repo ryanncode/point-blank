@@ -88,16 +88,43 @@ p, ul, ol {
     margin-bottom: 1em;
 }
 
+
 code {
     background-color: #3e4451;
     color: #adbac7;
     border-radius: 3px;
     font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+
+pre {
+    background: #2d333b;
+    color: #adbac7;
+    border-radius: 6px;
+    padding: 1em;
+    overflow-x: auto;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+    white-space: pre-wrap;
+    word-break: break-word;
+    box-sizing: border-box;
+    max-width: 100%;
 }
 
 /* Apply padding only to inline code, not code within pre blocks */
 code:not(pre > code) {
     padding: 0.2em 0.4em;
+    white-space: break-spaces;
+}
+/* Responsive fix for code/pre blocks on small screens */
+@media (max-width: 768px) {
+    pre, code {
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-size: 0.95em;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
 }
 
 /* Global link styles for readability */
