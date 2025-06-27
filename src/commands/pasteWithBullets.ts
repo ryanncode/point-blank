@@ -19,7 +19,7 @@ export class PasteWithBullets {
      */
     public async pasteWithBulletsCommand(): Promise<void> {
         const editor = vscode.window.activeTextEditor;
-        if (!editor) return;
+        if (!editor) { return; }
 
         const clipboardText = await vscode.env.clipboard.readText();
         const clipboardLines = clipboardText.split(/\r?\n/);
@@ -40,27 +40,42 @@ export class PasteWithBullets {
             // Remove the first empty line from clipboard content
             const contentToPaste = clipboardLines.slice(1);
 
-            // Append the partAfterCursor to the last line of the pasted content
-            if (contentToPaste.length > 0) {
-                contentToPaste[contentToPaste.length - 1] += partAfterCursor;
-            } else {
-                // If only an empty line was copied, and nothing else, then just paste nothing.
-                // This case should ideally be handled by the clipboardLines.length === 0 check above,
-                // but as a safeguard.
-                await vscode.commands.executeCommand('default:paste');
+            // If all lines after the first are empty, just insert a blank line
+            if (contentToPaste.every(line => line.trim() === '')) {
+                await editor.edit(editBuilder => {
+                    editBuilder.replace(currentLine.range, partBeforeCursor + '\n' + partAfterCursor);
+                });
+                const newPosition = new vscode.Position(selection.start.line + 1, 0);
+                editor.selection = new vscode.Selection(newPosition, newPosition);
                 return;
             }
 
-            const textToInsert = partBeforeCursor + '\n' + contentToPaste.join('\n');
-
+            // Otherwise, process the lines for bullet logic
+            // Use the same logic as processClipboardLines, but skip the first line
+            const documentModel = this._extensionState.getDocumentModel(document.uri.toString());
+            if (!documentModel) {
+                await vscode.commands.executeCommand('default:paste');
+                return;
+            }
+            const currentBlockNode = documentModel.documentTree.getNodeAtLine(currentLine.lineNumber);
+            if (!currentBlockNode) {
+                await vscode.commands.executeCommand('default:paste');
+                return;
+            }
+            // Fake a selection at the start of the line for bullet logic
+            const fakeSelection = new vscode.Selection(selection.start.line, 0, selection.start.line, 0);
+            const processedLines = this.processClipboardLines(contentToPaste, currentLine, currentBlockNode, fakeSelection);
+            // Append the partAfterCursor to the last line
+            if (processedLines.length > 0) {
+                processedLines[processedLines.length - 1] += partAfterCursor;
+            }
+            const textToInsert = partBeforeCursor + '\n' + processedLines.join('\n');
             await editor.edit(editBuilder => {
-                // Replace the current line with the modified content
                 editBuilder.replace(currentLine.range, textToInsert);
             });
-
             // Set the new cursor position at the end of the pasted content
-            const newPositionLine = selection.start.line + contentToPaste.length;
-            const newPositionChar = contentToPaste[contentToPaste.length - 1].length - partAfterCursor.length;
+            const newPositionLine = selection.start.line + processedLines.length;
+            const newPositionChar = processedLines.length > 0 ? processedLines[processedLines.length - 1].length - partAfterCursor.length : 0;
             const newPosition = new vscode.Position(newPositionLine, newPositionChar);
             editor.selection = new vscode.Selection(newPosition, newPosition);
             return;

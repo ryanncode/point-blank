@@ -6,6 +6,19 @@ import * as vscode from 'vscode';
  * and to initialize VS Code decoration types based on those settings.
  */
 export class Configuration {
+    /**
+     * Gets whether automatic bullet insertion is enabled.
+     */
+    public getAutoBullets(): boolean {
+        return this.getConfiguration().get<boolean>('autoBullets', true);
+    }
+
+    /**
+     * Sets whether automatic bullet insertion is enabled.
+     */
+    public async setAutoBullets(value: boolean): Promise<void> {
+        await this.getConfiguration().update('autoBullets', value, vscode.ConfigurationTarget.Global);
+    }
     private static _instance: Configuration;
 
     private constructor() { }

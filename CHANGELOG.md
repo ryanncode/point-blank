@@ -2,6 +2,12 @@
 
 All notable changes to the "pointblank" extension will be documented in this file.
 
+## [0.6.2] - 2025-06-27
+### Added
+- New setting and command: **Toggle Auto Bullets** (`pointblank.toggleAutoBullets`). You can now enable or disable automatic bullet point insertion for new lines and pastes, with a default keybinding (`Alt+B`).
+### Fixed
+- Multi-line paste: If the first line of the pasted content is empty, default bullet points are now correctly added to all following non-empty lines (when auto bullets are enabled).
+
 ## [6.1.0] - 2025-06-15
 
 ### Added

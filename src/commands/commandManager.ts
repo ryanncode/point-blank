@@ -5,6 +5,7 @@ import { BlockNode } from '../document/blockNode';
 import { PasteWithBullets } from './pasteWithBullets';
 import { EnterKeyHandler } from './enterKey';
 import { getBulletFromLine } from '../utils/bulletPointUtils';
+import { Configuration } from '../config/configuration';
 import { QueryService } from '../queries/queryService';
 import * as path from 'path';
 
@@ -87,6 +88,7 @@ export class CommandManager {
      * @param context The extension context.
      */
     private registerCommandOverrides(context: vscode.ExtensionContext): void {
+        const config = Configuration.getInstance();
         // --- `type` Command Override ---
         // Automatically inserts a bullet point when typing on an empty line.
         const typeCommand = vscode.commands.registerTextEditorCommand('type', async (editor, _edit, args) => {
@@ -94,10 +96,11 @@ export class CommandManager {
             const line = editor.document.lineAt(position.line);
             const typedChar = args.text;
 
-            // If the typed character is a newline, delegate to our custom Enter key handler.
-
-            // Check if the user is typing '[[', especially at the beginning of a line after a bullet.
-            // This is a specific trigger for Foam's backlink completion.
+            // If autoBullets is disabled, fall back to default behavior for bullet logic.
+            if (!config.getAutoBullets()) {
+                await vscode.commands.executeCommand('default:type', args);
+                return;
+            }
             if (typedChar === '[' && position.character > 0 && line.text.charAt(position.character - 1) === '[') {
                 await vscode.commands.executeCommand('default:type', args);
                 return;
@@ -202,7 +205,20 @@ export class CommandManager {
         });
 
         const pasteWithBulletsInstance = new PasteWithBullets(this.extensionState);
-        const pasteWithBulletsCommand = vscode.commands.registerTextEditorCommand('pointblank.pasteWithBullets', () => pasteWithBulletsInstance.pasteWithBulletsCommand());
+        const pasteWithBulletsCommand = vscode.commands.registerTextEditorCommand('pointblank.pasteWithBullets', async () => {
+            if (!config.getAutoBullets()) {
+                await vscode.commands.executeCommand('editor.action.clipboardPasteAction');
+                return;
+            }
+            await pasteWithBulletsInstance.pasteWithBulletsCommand();
+        });
+        const toggleAutoBulletsCommand = vscode.commands.registerCommand('pointblank.toggleAutoBullets', async () => {
+            const current = config.getAutoBullets();
+            await config.setAutoBullets(!current);
+            // Show a notification that disappears quickly (1s)
+            const message = `Point Blank: Auto Bullets ${!current ? 'Enabled' : 'Disabled'}`;
+            const disposable = vscode.window.setStatusBarMessage(message, 5000);
+        });
 
         // --- Default Behavior Fallbacks ---
         // These commands currently fall back to default behavior but are registered for future extension.
@@ -219,6 +235,7 @@ export class CommandManager {
             tabCommand,
             outdentCommand,
             pasteWithBulletsCommand,
+            toggleAutoBulletsCommand,
             // --- New Commands ---
             vscode.commands.registerTextEditorCommand('pointblank.insertTypeQuery', async (editor) => {
                 const typeName = await vscode.window.showInputBox({
