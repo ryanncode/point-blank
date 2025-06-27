@@ -304,7 +304,11 @@ export class CommandManager {
                 for (let i = queryCommentStartLine - 1; i >= 0; i--) {
                     const line = document.lineAt(i);
                     // Stop if we hit another query comment, an empty line, or a line that doesn't look like a result
-                    if (line.text.trim() === '' || line.text.startsWith('<!-- pointblank:query') || !line.text.startsWith('- [[')) {
+                    if (
+                        line.text.trim() === '' ||
+                        line.text.startsWith('<!-- pointblank:query') ||
+                        !(line.text.startsWith('- [[') || line.text.startsWith('- ![['))
+                    ) {
                         resultsStartLine = i + 1;
                         break;
                     }

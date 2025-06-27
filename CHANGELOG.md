@@ -1,6 +1,11 @@
+
 # Change Log
 
 All notable changes to the "pointblank" extension will be documented in this file.
+
+## [0.6.3] - 2025-06-27
+### Fixed
+- Inline query update now correctly recognizes and replaces both `LIST` (`- [[...]]`) and `TRANSCLUDE` (`- ![[...]]`) result lines above the query block. This prevents duplicate or stale results when using markdown transclusion in queries.
 
 ## [0.6.2] - 2025-06-27
 ### Added
