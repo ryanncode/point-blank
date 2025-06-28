@@ -1,3 +1,4 @@
+import { registerBulletSelectionGuard } from './utils/bulletSelectionGuard';
 /**
  * This file is the main entry point for the Point Blank VS Code extension.
  * It handles the activation and deactivation lifecycle of the extension,
@@ -37,6 +38,9 @@ export function activate(context: vscode.ExtensionContext): void {
     const decorationManager = new DecorationManager(extensionState);
     const commandManager = new CommandManager(extensionState);
     const enterKeyHandler = new EnterKeyHandler(extensionState);
+
+    // Register bullet selection guard to enforce bullet atomicity
+    registerBulletSelectionGuard(extensionState, context);
 
     // Initialize decoration types from configuration and prepare the manager.
     decorationManager.initialize();

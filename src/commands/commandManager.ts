@@ -26,62 +26,9 @@ export class CommandManager {
      * @param context The extension context provided by VS Code.
      */
     public register(context: vscode.ExtensionContext): void {
-        this.registerSelectionControl(context);
         this.registerCommandOverrides(context);
     }
 
-    /**
-     * Registers a listener to control text selection, preventing the cursor from moving inside decorated bullet ranges.
-     * This ensures that bullets are treated as atomic units.
-     * @param context The extension context.
-     */
-    private registerSelectionControl(context: vscode.ExtensionContext): void {
-        context.subscriptions.push(
-            vscode.window.onDidChangeTextEditorSelection(event => {
-                const editor = event.textEditor;
-                if (!editor) { return; }
-
-                const documentModel = this.extensionState.getDocumentModel(editor.document.uri.toString());
-                if (!documentModel) {
-                    vscode.commands.executeCommand('setContext', 'pointblank.atBulletStart', false);
-                    return;
-                }
-
-                // Only handle single-line selections for simplicity.
-                if (!editor.selection.isSingleLine) {
-                    vscode.commands.executeCommand('setContext', 'pointblank.atBulletStart', false);
-                    return;
-                }
-
-                const line = editor.document.lineAt(editor.selection.active.line);
-                const blockNode = documentModel.documentTree.getNodeAtLine(line.lineNumber);
-                const activePosition = editor.selection.active;
-
-                let atBulletStart = false;
-                if (blockNode && blockNode.bulletRange) {
-                    const bulletEndChar = blockNode.bulletRange.end.character;
-
-                    // If the cursor is within the bullet's range, move it to the end of the bullet.
-                    if (activePosition.character < bulletEndChar) {
-                        const newPosition = new vscode.Position(activePosition.line, bulletEndChar);
-                        if (editor.selection.isEmpty) {
-                            // It's a cursor, not a selection. Move it to the boundary.
-                            editor.selection = new vscode.Selection(newPosition, newPosition);
-                        } else {
-                            // It's a selection. Adjust the active end to the boundary.
-                            editor.selection = new vscode.Selection(editor.selection.anchor, newPosition);
-                        }
-                    }
-
-                    // Set context key: true if cursor is exactly at the end of the bullet
-                    if (activePosition.character === bulletEndChar) {
-                        atBulletStart = true;
-                    }
-                }
-                vscode.commands.executeCommand('setContext', 'pointblank.atBulletStart', atBulletStart);
-            })
-        );
-    }
 
     /**
      * Registers overrides for default text editor commands to provide custom behavior.
