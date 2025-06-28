@@ -61,6 +61,20 @@ export class EnterKeyHandler {
         // creating a new bullet point for the text that was after the cursor.
         const textAfterCursor = currentLine.text.substring(position.character);
 
+        // --- FIX: If at start of line and next chars are already a bullet, just insert blank line ---
+        const atLineStart = position.character === currentLine.firstNonWhitespaceCharacterIndex;
+        const bulletMatch = /^([*+-]|\u2022|\d+[\.)]|>)\s/.test(currentLine.text.substring(position.character));
+        if (atLineStart && bulletMatch) {
+            // Insert a blank line with same indentation
+            const indentation = currentLine.text.substring(0, currentLine.firstNonWhitespaceCharacterIndex);
+            await editor.edit(editBuilder => {
+                editBuilder.insert(position, '\n' + indentation);
+            });
+            const newPosition = new vscode.Position(position.line + 1, indentation.length);
+            editor.selection = new vscode.Selection(newPosition, newPosition);
+            return;
+        }
+
         if (textAfterCursor.length > 0) {
             await this.insertBulletPointAndMoveText(editor, position, document);
             return; // Explicitly return after handling, consume event

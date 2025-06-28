@@ -4,19 +4,17 @@
  * Returns the bullet from that line, or the default if none found.
  */
 export function findSiblingBulletByIndent(document: import('vscode').TextDocument, lineNumber: number, indent: number, defaultBullet = '• '): string {
-    // Search down
-    for (let i = lineNumber + 1; i < document.lineCount; i++) {
-        const line = document.lineAt(i);
-        if (line.text.trim().length === 0) { break; }
-        if (line.firstNonWhitespaceCharacterIndex === indent) {
+    // Check 1 line below
+    if (lineNumber + 1 < document.lineCount) {
+        const line = document.lineAt(lineNumber + 1);
+        if (line.text.trim().length > 0 && line.firstNonWhitespaceCharacterIndex === indent) {
             return require('./bulletPointUtils').getBulletFromLine(line);
         }
     }
-    // Search up
-    for (let i = lineNumber - 1; i >= 0; i--) {
-        const line = document.lineAt(i);
-        if (line.text.trim().length === 0) { break; }
-        if (line.firstNonWhitespaceCharacterIndex === indent) {
+    // Check 1 line above
+    if (lineNumber - 1 >= 0) {
+        const line = document.lineAt(lineNumber - 1);
+        if (line.text.trim().length > 0 && line.firstNonWhitespaceCharacterIndex === indent) {
             return require('./bulletPointUtils').getBulletFromLine(line);
         }
     }
