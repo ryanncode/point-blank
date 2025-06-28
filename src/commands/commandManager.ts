@@ -71,7 +71,7 @@ export class CommandManager {
             let handled = false;
             if (typedChar.length === 1 && !typedChar.includes('\n') && !typedChar.includes('\r')) {
                 if (line.text.trim().length === 0 && position.character === line.firstNonWhitespaceCharacterIndex) {
-                    const markdownPrefixRegex = /^\s*([\*\+\-]|>|#{1,6}|\d+[\.\)])/;
+                    const markdownPrefixRegex = /^\s*([\*\+\-]|>|#{1,6}|\d+[\.\)])$/;
                     if (!markdownPrefixRegex.test(typedChar)) {
                         // Use shared helper for bullet style matching
                         const bulletToInsert = findSiblingBulletByIndent(editor.document, position.line, line.firstNonWhitespaceCharacterIndex) || '• ';
@@ -102,6 +102,24 @@ export class CommandManager {
                 await editor.edit(editBuilder => {
                     editBuilder.insert(currentPositionAfterType, ' ');
                 });
+            }
+
+            // Remove the default bullet if a numbered list item is being typed at the start of the line (e.g., '1.')
+            const currentLineText = currentLineAfterType.text;
+            const currentLineIndent = currentLineAfterType.firstNonWhitespaceCharacterIndex;
+            const bulletPrefix = '• ';
+            // Regex matches e.g. '1. ', '2. ', '10. ', etc. at the start of the line (after indentation)
+            const numberedListPattern = /^\d+\.\s/;
+            if (currentLineText.substring(currentLineIndent).startsWith(bulletPrefix)) {
+                const afterBullet = currentLineText.substring(currentLineIndent + bulletPrefix.length);
+                if (numberedListPattern.test(afterBullet)) {
+                    // Remove the bullet
+                    const bulletStartPos = new vscode.Position(currentLineAfterType.lineNumber, currentLineIndent);
+                    const bulletEndPos = new vscode.Position(currentLineAfterType.lineNumber, currentLineIndent + bulletPrefix.length);
+                    await editor.edit(editBuilder => {
+                        editBuilder.delete(new vscode.Range(bulletStartPos, bulletEndPos));
+                    });
+                }
             }
 
             // After character is typed (either by us or default), check for key-value pair and remove bullet if necessary.

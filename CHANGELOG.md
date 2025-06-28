@@ -1,13 +1,14 @@
 # Change Log
 
+All notable changes to the "pointblank" extension will be documented in this file.
+
 ## [0.6.4] - 2025-06-27
-### Changed
+### Fixed
 - Pasting a bullet at the beginning of a line no longer erases the line; pasted content is merged or inserted intelligently.
-- When pasting, the bullet point style now matches the next or previous line for consistency.
+- Numbered list items will remove their default bullet point.
 ### Added
 - You can now select a single-line bullet point for copying, making it easier to duplicate or move bullet items.
-
-All notable changes to the "pointblank" extension will be documented in this file.
+- When typing or pasting from the start of a list item line, the bullet point style now matches the next or previous list item line at the same level of indent for consistency.
 
 ## [0.6.3] - 2025-06-27
 ### Fixed
