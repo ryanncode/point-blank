@@ -22,18 +22,18 @@ export async function quickOpenFileCommand(): Promise<void> {
         placeHolder: 'Select a template type to create a new file',
         title: 'Quick Open File from Template'
     });
-    if (!selectedTemplateName) return; // User cancelled
+    if (!selectedTemplateName) {return;} // User cancelled
 
     const fileName = await vscode.window.showInputBox({
         prompt: `Enter a filename for the new ${selectedTemplateName} file`,
         value: `${selectedTemplateName.toLowerCase().replace(/\s/g, '-')}.md`,
         validateInput: text => {
-            if (!text.trim()) return 'Filename cannot be empty.';
-            if (!text.endsWith('.md')) return 'Filename must end with .md';
+            if (!text.trim()) {return 'Filename cannot be empty.';}
+            if (!text.endsWith('.md')) {return 'Filename must end with .md';}
             return null;
         }
     });
-    if (!fileName) return; // User cancelled
+    if (!fileName) {return;} // User cancelled
 
     // --- Step 2: Prepare File Content ---
     const parsedTemplate = await templateService.getParsedTemplate(selectedTemplateName);

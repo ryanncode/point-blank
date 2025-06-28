@@ -20,6 +20,7 @@ docs/vendor/
 # VS Code Extension specific
 *.vsix
 .vscode-test-results/
+.vscode-test/
 
 # Editor and OS specific
 .vscode/

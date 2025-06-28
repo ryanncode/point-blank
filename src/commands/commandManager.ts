@@ -9,7 +9,6 @@ import { getBulletForNewLine } from '../utils/bulletStyleUtils';
 import { findSiblingBulletByIndent } from '../utils/bulletStyleUtils';
 import { Configuration } from '../config/configuration';
 import { QueryService } from '../queries/queryService';
-import * as path from 'path';
 
 /**
  * Manages the registration and logic for all commands, including overrides for default VS Code behavior.

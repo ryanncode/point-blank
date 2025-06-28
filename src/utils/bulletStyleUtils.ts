@@ -8,14 +8,14 @@ export function findSiblingBulletByIndent(document: import('vscode').TextDocumen
     if (lineNumber + 1 < document.lineCount) {
         const line = document.lineAt(lineNumber + 1);
         if (line.text.trim().length > 0 && line.firstNonWhitespaceCharacterIndex === indent) {
-            return require('./bulletPointUtils').getBulletFromLine(line);
+            return getBulletFromLine(line);
         }
     }
     // Check 1 line above
     if (lineNumber - 1 >= 0) {
         const line = document.lineAt(lineNumber - 1);
         if (line.text.trim().length > 0 && line.firstNonWhitespaceCharacterIndex === indent) {
-            return require('./bulletPointUtils').getBulletFromLine(line);
+            return getBulletFromLine(line);
         }
     }
     return defaultBullet;
