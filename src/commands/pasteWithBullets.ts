@@ -178,11 +178,47 @@ export class PasteWithBullets {
             if (currentBlockNode.bulletType !== 'none' && currentBlockNode.bulletRange) {
                 restOfLine = currentLine.text.substring(currentBlockNode.bulletRange.end.character);
             }
+
+            // --- Bullet selection logic ---
+            let siblingBullet: string | undefined;
+            const docTree = currentBlockNode.parent?.children ? currentBlockNode.parent.children : undefined;
+            const allNodes = currentBlockNode.parent ? currentBlockNode.parent.children : undefined;
+            // Try next sibling (line below, same indent)
+            let nextSiblingBullet: string | undefined;
+            let prevSiblingBullet: string | undefined;
+            const doc = currentLine;
+            const document = currentLine;
+            const lineNumber = currentLine.lineNumber;
+            // Try next line (below)
+            if (currentBlockNode && currentBlockNode.parent) {
+                const siblings = currentBlockNode.parent.children;
+                const idx = siblings.findIndex(n => n.lineNumber === currentBlockNode.lineNumber);
+                if (idx !== -1 && idx + 1 < siblings.length) {
+                    const next = siblings[idx + 1];
+                    if (next.indent === currentBlockNode.indent && next.bulletType !== 'none' && next.bulletRange) {
+                        nextSiblingBullet = next.line.text.substring(next.bulletRange.start.character, next.bulletRange.end.character);
+                    }
+                }
+                // Try previous line (above)
+                if (idx > 0) {
+                    const prev = siblings[idx - 1];
+                    if (prev.indent === currentBlockNode.indent && prev.bulletType !== 'none' && prev.bulletRange) {
+                        prevSiblingBullet = prev.line.text.substring(prev.bulletRange.start.character, prev.bulletRange.end.character);
+                    }
+                }
+            }
+
             if (clipboardFirstLineBulletType !== 'none') {
                 // If clipboard has a bullet, use it and its content
                 finalFirstLineContent = `${firstClipboardLine.substring(clipboardFirstLineBulletRange!.start.character, clipboardFirstLineBulletRange!.end.character)}${contentAfterClipboardBullet}`;
+            } else if (nextSiblingBullet) {
+                // Prefer next sibling's bullet
+                finalFirstLineContent = `${nextSiblingBullet}${contentAfterClipboardBullet}`;
+            } else if (prevSiblingBullet) {
+                // Then try previous sibling's bullet
+                finalFirstLineContent = `${prevSiblingBullet}${contentAfterClipboardBullet}`;
             } else if (currentBlockNode.bulletType !== 'none' && currentBlockNode.bulletRange) {
-                // If current line has a bullet but clipboard doesn't, preserve current line's bullet
+                // Fallback: If current line has a bullet but clipboard doesn't, preserve current line's bullet
                 finalFirstLineContent = `${currentBlockNode.line.text.substring(currentBlockNode.bulletRange.start.character, currentBlockNode.bulletRange.end.character)}${contentAfterClipboardBullet}`;
             } else {
                 // Neither has a bullet, add a default one
