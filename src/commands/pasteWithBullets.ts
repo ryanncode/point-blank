@@ -52,7 +52,6 @@ export class PasteWithBullets {
             }
 
             // Otherwise, process the lines for bullet logic
-            // Use the same logic as processClipboardLines, but skip the first line
             const documentModel = this._extensionState.getDocumentModel(document.uri.toString());
             if (!documentModel) {
                 await vscode.commands.executeCommand('default:paste');
@@ -66,17 +65,19 @@ export class PasteWithBullets {
             // Fake a selection at the start of the line for bullet logic
             const fakeSelection = new vscode.Selection(selection.start.line, 0, selection.start.line, 0);
             const processedLines = this.processClipboardLines(contentToPaste, currentLine, currentBlockNode, fakeSelection, document);
-            // Append the partAfterCursor to the last line
-            if (processedLines.length > 0) {
-                processedLines[processedLines.length - 1] += partAfterCursor;
+
+            // Compose the new lines: partBeforeCursor, then processedLines, then append partAfterCursor to the last line
+            const newLines = [partBeforeCursor, ...processedLines];
+            if (newLines.length > 1) {
+                newLines[newLines.length - 1] += partAfterCursor;
             }
-            const textToInsert = partBeforeCursor + '\n' + processedLines.join('\n');
+            const textToInsert = newLines.join('\n');
             await editor.edit(editBuilder => {
                 editBuilder.replace(currentLine.range, textToInsert);
             });
             // Set the new cursor position at the end of the pasted content
-            const newPositionLine = selection.start.line + processedLines.length;
-            const newPositionChar = processedLines.length > 0 ? processedLines[processedLines.length - 1].length - partAfterCursor.length : 0;
+            const newPositionLine = selection.start.line + newLines.length - 1;
+            const newPositionChar = newLines[newLines.length - 1].length;
             const newPosition = new vscode.Position(newPositionLine, newPositionChar);
             editor.selection = new vscode.Selection(newPosition, newPosition);
             return;
