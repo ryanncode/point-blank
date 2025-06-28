@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { ExtensionState } from '../state/extensionState';
 import { BlockNode } from '../document/blockNode';
 import { determineBulletType } from '../utils/bulletPointUtils';
+import { getBulletForNewLine } from '../utils/bulletStyleUtils';
 
 /**
  * Implements the `pointblank.pasteWithBullets` command, which provides intelligent pasting
@@ -64,7 +65,7 @@ export class PasteWithBullets {
             }
             // Fake a selection at the start of the line for bullet logic
             const fakeSelection = new vscode.Selection(selection.start.line, 0, selection.start.line, 0);
-            const processedLines = this.processClipboardLines(contentToPaste, currentLine, currentBlockNode, fakeSelection);
+            const processedLines = this.processClipboardLines(contentToPaste, currentLine, currentBlockNode, fakeSelection, document);
             // Append the partAfterCursor to the last line
             if (processedLines.length > 0) {
                 processedLines[processedLines.length - 1] += partAfterCursor;
@@ -131,8 +132,7 @@ export class PasteWithBullets {
             return;
         }
 
-        // Process the clipboard content line by line.
-        const processedLines = this.processClipboardLines(clipboardLines, currentLine, currentBlockNode, selection);
+        const processedLines = this.processClipboardLines(clipboardLines, currentLine, currentBlockNode, selection, document);
         const textToInsert = processedLines.join('\n');
 
         // Perform the edit and update the cursor position.
@@ -150,9 +150,10 @@ export class PasteWithBullets {
      * @param currentLine The `TextLine` where the paste operation is initiated.
      * @param currentBlockNode The `BlockNode` for the current line, providing context about existing bullets.
      * @param selection The current selection in the editor, used to determine paste position.
+     * @param document The TextDocument for bullet style logic.
      * @returns An array of processed lines ready for insertion.
      */
-    private processClipboardLines(clipboardLines: string[], currentLine: vscode.TextLine, currentBlockNode: BlockNode, selection: vscode.Selection): string[] {
+    private processClipboardLines(clipboardLines: string[], currentLine: vscode.TextLine, currentBlockNode: BlockNode, selection: vscode.Selection, document: vscode.TextDocument): string[] {
         const processed: string[] = [];
         const currentLineIndentation = currentLine.firstNonWhitespaceCharacterIndex;
         // --- Handle the first line of the paste ---
@@ -179,50 +180,19 @@ export class PasteWithBullets {
                 restOfLine = currentLine.text.substring(currentBlockNode.bulletRange.end.character);
             }
 
-            // --- Bullet selection logic ---
-            let siblingBullet: string | undefined;
-            const docTree = currentBlockNode.parent?.children ? currentBlockNode.parent.children : undefined;
-            const allNodes = currentBlockNode.parent ? currentBlockNode.parent.children : undefined;
-            // Try next sibling (line below, same indent)
-            let nextSiblingBullet: string | undefined;
-            let prevSiblingBullet: string | undefined;
-            const doc = currentLine;
-            const document = currentLine;
-            const lineNumber = currentLine.lineNumber;
-            // Try next line (below)
-            if (currentBlockNode && currentBlockNode.parent) {
-                const siblings = currentBlockNode.parent.children;
-                const idx = siblings.findIndex(n => n.lineNumber === currentBlockNode.lineNumber);
-                if (idx !== -1 && idx + 1 < siblings.length) {
-                    const next = siblings[idx + 1];
-                    if (next.indent === currentBlockNode.indent && next.bulletType !== 'none' && next.bulletRange) {
-                        nextSiblingBullet = next.line.text.substring(next.bulletRange.start.character, next.bulletRange.end.character);
-                    }
-                }
-                // Try previous line (above)
-                if (idx > 0) {
-                    const prev = siblings[idx - 1];
-                    if (prev.indent === currentBlockNode.indent && prev.bulletType !== 'none' && prev.bulletRange) {
-                        prevSiblingBullet = prev.line.text.substring(prev.bulletRange.start.character, prev.bulletRange.end.character);
-                    }
-                }
-            }
-
+            // --- Bullet selection logic (shared utility) ---
             if (clipboardFirstLineBulletType !== 'none') {
-                // If clipboard has a bullet, use it and its content
+                // 1. Clipboard has a bullet: use it
                 finalFirstLineContent = `${firstClipboardLine.substring(clipboardFirstLineBulletRange!.start.character, clipboardFirstLineBulletRange!.end.character)}${contentAfterClipboardBullet}`;
-            } else if (nextSiblingBullet) {
-                // Prefer next sibling's bullet
-                finalFirstLineContent = `${nextSiblingBullet}${contentAfterClipboardBullet}`;
-            } else if (prevSiblingBullet) {
-                // Then try previous sibling's bullet
-                finalFirstLineContent = `${prevSiblingBullet}${contentAfterClipboardBullet}`;
-            } else if (currentBlockNode.bulletType !== 'none' && currentBlockNode.bulletRange) {
-                // Fallback: If current line has a bullet but clipboard doesn't, preserve current line's bullet
-                finalFirstLineContent = `${currentBlockNode.line.text.substring(currentBlockNode.bulletRange.start.character, currentBlockNode.bulletRange.end.character)}${contentAfterClipboardBullet}`;
             } else {
-                // Neither has a bullet, add a default one
-                finalFirstLineContent = `• ${contentAfterClipboardBullet}`;
+                // 2. Use shared bullet style logic for new line
+                let bullet;
+                if (currentBlockNode && currentBlockNode.parent) {
+                    bullet = getBulletForNewLine(currentBlockNode, document);
+                } else {
+                    bullet = require('../utils/bulletStyleUtils').findSiblingBulletByIndent(document, currentLine.lineNumber, currentLine.firstNonWhitespaceCharacterIndex, '• ');
+                }
+                finalFirstLineContent = `${bullet}${contentAfterClipboardBullet}`;
             }
             // Insert the pasted bullet/content before the rest of the original line
             processed.push(' '.repeat(currentLineIndentation + originalClipboardFirstLineIndent) + finalFirstLineContent + restOfLine);
@@ -240,6 +210,38 @@ export class PasteWithBullets {
             const line = clipboardLines[i];
             const originalLineIndent = line.match(/^\s*/)?.[0].length || 0;
             const { bulletType, bulletRange } = determineBulletType(line, originalLineIndent, false, false, 0);
+            const contentAfterBullet = bulletType !== 'none'
+                ? line.substring(bulletRange!.end.character).trimStart()
+                : line.trim();
+
+            let processedLine: string;
+            if (bulletType !== 'none') {
+                // If the line has a bullet, preserve it and its content
+                processedLine = `${line.substring(bulletRange!.start.character, bulletRange!.end.character)}${contentAfterBullet}`;
+            } else if (contentAfterBullet.trim() === '') {
+                // If the line is empty or only whitespace, do not add a bullet
+                processedLine = contentAfterBullet;
+            }
+            else {
+                // If no bullet and not empty, add a default one
+                processedLine = `• ${contentAfterBullet}`;
+            }
+
+            // Each line after the first should only have its original absolute indent level.
+            processed.push(' '.repeat(originalLineIndent) + processedLine);
+        }
+
+        return processed;
+    }
+
+    /**
+     * Processes each line from the clipboard, adding bullets where necessary.
+     * @param clipboardLines The array of lines read from the clipboard.
+     * @param currentLine The `TextLine` where the paste operation is initiated.
+     * @param currentBlockNode The `BlockNode` for the current line, providing context about existing bullets.
+     * @param selection The current selection in the editor, used to determine paste position.
+     * @returns An array of processed lines ready for insertion.
+    private processClipboardLines(clipboardLines: string[], currentLine: vscode.TextLine, currentBlockNode: BlockNode, selection: vscode.Selection, document: vscode.TextDocument): string[] {
             const contentAfterBullet = bulletType !== 'none'
                 ? line.substring(bulletRange!.end.character).trimStart()
                 : line.trim();

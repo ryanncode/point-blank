@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { ExtensionState } from '../state/extensionState';
 import { BlockNode } from '../document/blockNode';
 import { getBulletFromLine } from '../utils/bulletPointUtils';
+import { getBulletForNewLine } from '../utils/bulletStyleUtils';
 import { expandTemplateCommand } from './expandTemplate'; // Import the command
 
 /**
@@ -199,18 +200,17 @@ export class EnterKeyHandler {
         const currentLine = document.lineAt(position.line);
         const textAfterCursor = currentLine.text.substring(position.character);
         const indentation = currentLine.text.substring(0, currentLine.firstNonWhitespaceCharacterIndex);
+        const bullet = getBulletFromLine(currentLine);
 
         await editor.edit(editBuilder => {
             // Delete text after the cursor on the current line.
             editBuilder.delete(new vscode.Range(position, currentLine.range.end));
-            // Determine the bullet point based on the current line.
-            const bullet = getBulletFromLine(currentLine);
-            // Insert a new line with indentation, the determined bullet, and the moved text.
+            // Insert a new line with indentation, the current line's bullet, and the moved text.
             editBuilder.insert(position, `\n${indentation}${bullet}${textAfterCursor}`);
         });
 
         // Position the cursor after the new bullet point.
-        const newPosition = new vscode.Position(position.line + 1, indentation.length + getBulletFromLine(currentLine).length);
+        const newPosition = new vscode.Position(position.line + 1, indentation.length + bullet.length);
         editor.selection = new vscode.Selection(newPosition, newPosition);
     }
 

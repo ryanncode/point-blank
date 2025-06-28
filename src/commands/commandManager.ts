@@ -5,6 +5,8 @@ import { BlockNode } from '../document/blockNode';
 import { PasteWithBullets } from './pasteWithBullets';
 import { EnterKeyHandler } from './enterKey';
 import { getBulletFromLine } from '../utils/bulletPointUtils';
+import { getBulletForNewLine } from '../utils/bulletStyleUtils';
+import { findSiblingBulletByIndent } from '../utils/bulletStyleUtils';
 import { Configuration } from '../config/configuration';
 import { QueryService } from '../queries/queryService';
 import * as path from 'path';
@@ -65,31 +67,30 @@ export class CommandManager {
             }
 
             // Scenario 1: Auto-insert bullet on empty line if not already a markdown prefix
+
+            let handled = false;
             if (typedChar.length === 1 && !typedChar.includes('\n') && !typedChar.includes('\r')) {
                 if (line.text.trim().length === 0 && position.character === line.firstNonWhitespaceCharacterIndex) {
                     const markdownPrefixRegex = /^\s*([\*\+\-]|>|#{1,6}|\d+[\.\)])/;
-                    // Only insert a bullet if the typed character is NOT a markdown prefix.
-                    // This allows VS Code's default 'type' command to handle markdown prefixes like '[[',
-                    // ensuring interoperability with other extensions like Foam.
                     if (!markdownPrefixRegex.test(typedChar)) {
-                        let bulletToInsert = '• '; // Default bullet
-                        if (position.line > 0) {
-                            const previousLine = editor.document.lineAt(position.line - 1);
-                            bulletToInsert = getBulletFromLine(previousLine);
-                        }
-
+                        // Use shared helper for bullet style matching
+                        const bulletToInsert = findSiblingBulletByIndent(editor.document, position.line, line.firstNonWhitespaceCharacterIndex) || '• ';
                         await editor.edit(editBuilder => {
-                            // Insert only the bullet point. The actual character typed by the user
-                            // will be handled by the default:type command below.
-                            editBuilder.insert(position, bulletToInsert);
+                            editBuilder.insert(position, bulletToInsert + typedChar);
                         });
+                        // Move cursor to just after the inserted character
+                        const newPos = position.with(undefined, position.character + (bulletToInsert + typedChar).length);
+                        editor.selection = new vscode.Selection(newPos, newPos);
+                        handled = true;
                     }
                 }
             }
 
-            // Always let the default 'type' command handle the character insertion.
-            // This ensures other extensions (like Foam) can correctly process the typed character.
-            await vscode.commands.executeCommand('default:type', args);
+            if (!handled) {
+                // Always let the default 'type' command handle the character insertion.
+                // This ensures other extensions (like Foam) can correctly process the typed character.
+                await vscode.commands.executeCommand('default:type', args);
+            }
 
             // After character is typed (either by us or default), check if '::' was just typed
             // and auto-complete to ':: '.
