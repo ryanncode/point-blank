@@ -173,6 +173,11 @@ export class PasteWithBullets {
         if (selection.start.character === currentLine.firstNonWhitespaceCharacterIndex) {
             // Pasting at the very beginning of the line (before any existing bullet or text)
             baseIndentForSubsequentLines = currentLineIndentation;
+            let restOfLine = currentLine.text.substring(currentLine.firstNonWhitespaceCharacterIndex);
+            // If the current line has a bullet, skip it in the restOfLine
+            if (currentBlockNode.bulletType !== 'none' && currentBlockNode.bulletRange) {
+                restOfLine = currentLine.text.substring(currentBlockNode.bulletRange.end.character);
+            }
             if (clipboardFirstLineBulletType !== 'none') {
                 // If clipboard has a bullet, use it and its content
                 finalFirstLineContent = `${firstClipboardLine.substring(clipboardFirstLineBulletRange!.start.character, clipboardFirstLineBulletRange!.end.character)}${contentAfterClipboardBullet}`;
@@ -183,7 +188,8 @@ export class PasteWithBullets {
                 // Neither has a bullet, add a default one
                 finalFirstLineContent = `• ${contentAfterClipboardBullet}`;
             }
-            processed.push(' '.repeat(currentLineIndentation + originalClipboardFirstLineIndent) + finalFirstLineContent);
+            // Insert the pasted bullet/content before the rest of the original line
+            processed.push(' '.repeat(currentLineIndentation + originalClipboardFirstLineIndent) + finalFirstLineContent + restOfLine);
         } else {
             // Pasting mid-line or after existing content/bullet
             baseIndentForSubsequentLines = 0;
