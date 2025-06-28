@@ -1,5 +1,11 @@
-
 # Change Log
+
+## [0.6.4] - 2025-06-27
+### Changed
+- Pasting a bullet at the beginning of a line no longer erases the line; pasted content is merged or inserted intelligently.
+- When pasting, the bullet point style now matches the next or previous line for consistency.
+### Added
+- You can now select a single-line bullet point for copying, making it easier to duplicate or move bullet items.
 
 All notable changes to the "pointblank" extension will be documented in this file.
 
@@ -14,7 +20,6 @@ All notable changes to the "pointblank" extension will be documented in this fil
 - Multi-line paste: If the first line of the pasted content is empty, default bullet points are now correctly added to all following non-empty lines (when auto bullets are enabled).
 
 ## [6.1.0] - 2025-06-15
-
 ### Added
 - **Powerful Inline Query Language**: A major new feature that allows you to search for and display information directly within your notes.
     - Supports `LIST` (wiki-style links) and `TRANSCLUDE` (embedded content) actions.
@@ -33,10 +38,8 @@ All notable changes to the "pointblank" extension will be documented in this fil
 ## [0.5.1] - 2025-06-15
 ### Added
 - When creating a new bullet point, it will now inherit the style of the previous line.
-
 ### Changed
 - Updated and clarified the names of color-related settings.
-
 ### Fixed
 - Resolved widescreen layout issues on the website.
 
