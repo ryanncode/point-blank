@@ -39,24 +39,28 @@ export class PasteWithBullets {
         const { selection, document } = editor;
         const currentLine = document.lineAt(selection.start.line);
 
+
         // Typed node paste
         if (clipboardLines.length > 0 && /^\(\w+\)/.test(clipboardLines[0].trim())) {
             const adjustedClipboardLines = processTypedNodePaste({ clipboardLines });
             const textToInsert = adjustedClipboardLines.join('\n');
+            let startLine = selection.start.line;
             await editor.edit(editBuilder => {
                 editBuilder.replace(selection, textToInsert);
             });
+            // Place cursor at end of last pasted line
             const lastLineIdx = adjustedClipboardLines.length - 1;
             const lastLineText = adjustedClipboardLines[lastLineIdx] || '';
-            const newPosition = new vscode.Position(selection.start.line + lastLineIdx, lastLineText.length);
+            const newPosition = new vscode.Position(startLine + lastLineIdx, lastLineText.length);
             editor.selection = new vscode.Selection(newPosition, newPosition);
             return;
         }
 
         // Multi-line paste
-        if (clipboardLines.length > 1 && selection.isEmpty) {
+        if (clipboardLines.length > 1) {
             let partBeforeCursor: string;
             let partAfterCursor: string;
+            let startLine = selection.start.line;
             // If cursor is at first non-whitespace character, treat as start of line for bullet logic
             if (selection.start.character === currentLine.firstNonWhitespaceCharacterIndex) {
                 partBeforeCursor = '';
@@ -80,9 +84,12 @@ export class PasteWithBullets {
             await editor.edit(editBuilder => {
                 editBuilder.replace(currentLine.range, newLines.join('\n'));
             });
+            // Place cursor just before the original partAfterCursor on the last pasted line
             const lastIdx = newLines.length - 1;
             const lastLineText = newLines[lastIdx];
-            const newPosition = new vscode.Position(selection.start.line + lastIdx, lastLineText.length);
+            const afterTextLen = partAfterCursor.length;
+            const newChar = Math.max(0, lastLineText.length - afterTextLen);
+            const newPosition = new vscode.Position(startLine + lastIdx, newChar);
             editor.selection = new vscode.Selection(newPosition, newPosition);
             return;
         }
@@ -90,6 +97,7 @@ export class PasteWithBullets {
         // Single-line paste: use the same bullet detection and context as multi-line paste
         let partBeforeCursor: string;
         let partAfterCursor: string;
+        let startLine = selection.start.line;
         if (selection.start.character === currentLine.firstNonWhitespaceCharacterIndex) {
             partBeforeCursor = '';
             partAfterCursor = currentLine.text.substring(selection.start.character);
@@ -112,7 +120,10 @@ export class PasteWithBullets {
         await editor.edit(editBuilder => {
             editBuilder.replace(currentLine.range, newLines[0]);
         });
-        const newPosition = new vscode.Position(selection.start.line, newLines[0].length);
+        // Place cursor just before the original partAfterCursor on the pasted line
+        const afterTextLen = partAfterCursor.length;
+        const newChar = Math.max(0, newLines[0].length - afterTextLen);
+        const newPosition = new vscode.Position(startLine, newChar);
         editor.selection = new vscode.Selection(newPosition, newPosition);
     }
 }
