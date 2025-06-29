@@ -165,6 +165,22 @@
           "description": "Automatically insert bullet points on new lines. Toggle with the Point Blank: Toggle Auto Bullets command."
         }
       }
+    },
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "pointblank.expandTemplate",
+          "when": "false"
+        },
+        {
+          "command": "pointblank.tab",
+          "when": "false"
+        },
+        {
+          "command": "pointblank.enterKey",
+          "when": "false"
+    }
+      ]
     }
   },
   "scripts": {
