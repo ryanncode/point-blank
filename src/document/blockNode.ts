@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { determineBulletType } from '../utils/bulletPointUtils';
+import { determineBulletType } from '../utils/bulletPointUtils.vscode';
 
 export interface KeyValueProperty {
     key: string;

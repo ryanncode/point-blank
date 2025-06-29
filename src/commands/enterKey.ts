@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
 import { ExtensionState } from '../state/extensionState';
 import { BlockNode } from '../document/blockNode';
-import { getBulletFromLine } from '../utils/bulletPointUtils';
-import { getBulletForNewLine } from '../utils/bulletStyleUtils';
+import { getBulletFromLine } from '../utils/bulletPointUtils.vscode';
+// import { getBulletForNewLine } from '../utils/bulletStyleUtils';
 import { expandTemplateCommand } from './expandTemplate'; // Import the command
 
 /**

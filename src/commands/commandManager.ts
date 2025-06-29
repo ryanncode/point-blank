@@ -4,9 +4,9 @@ import { DocumentModel } from '../document/documentModel';
 import { BlockNode } from '../document/blockNode';
 import { PasteWithBullets } from './pasteWithBullets';
 import { EnterKeyHandler } from './enterKey';
-import { getBulletFromLine } from '../utils/bulletPointUtils';
-import { getBulletForNewLine } from '../utils/bulletStyleUtils';
-import { findSiblingBulletByIndent } from '../utils/bulletStyleUtils';
+import { getBulletFromLine } from '../utils/bulletPointUtils.vscode';
+import { getBulletStyleFromAdjacentLines } from '../utils/bulletStyleUtils';
+// ...existing code...
 import { Configuration } from '../config/configuration';
 import { QueryService } from '../queries/queryService';
 
@@ -28,6 +28,38 @@ export class CommandManager {
      */
     public register(context: vscode.ExtensionContext): void {
         this.registerCommandOverrides(context);
+
+        // Set up context key for Tab override
+        vscode.window.onDidChangeTextEditorSelection(this.updateAtBulletStartContext, this, context.subscriptions);
+        vscode.window.onDidChangeActiveTextEditor(this.updateAtBulletStartContext, this, context.subscriptions);
+        // Set initial context
+        this.updateAtBulletStartContext();
+    }
+
+    /**
+     * Sets the 'pointblank.atBulletStart' context key if the cursor is at the start of a bullet or at the start of the line.
+     */
+    private updateAtBulletStartContext(): void {
+        const editor = vscode.window.activeTextEditor;
+        let atBulletStart = false;
+        if (editor && editor.selection.isSingleLine) {
+            const selection = editor.selection;
+            const line = editor.document.lineAt(selection.active.line);
+            const lineText = line.text;
+            const indent = line.firstNonWhitespaceCharacterIndex;
+            const bulletMatch = lineText.slice(indent).match(/^([*\-+•‣◦▪‣•·])\s+/);
+            if (bulletMatch) {
+                const bulletEnd = indent + bulletMatch[0].length;
+                if (selection.active.character === 0 || selection.active.character === bulletEnd) {
+                    atBulletStart = true;
+                }
+            } else {
+                if (selection.active.character === 0) {
+                    atBulletStart = true;
+                }
+            }
+        }
+        vscode.commands.executeCommand('setContext', 'pointblank.atBulletStart', atBulletStart);
     }
 
 
@@ -73,7 +105,8 @@ export class CommandManager {
                     const markdownPrefixRegex = /^\s*([\*\+\-]|>|#{1,6}|\d+[\.\)])$/;
                     if (!markdownPrefixRegex.test(typedChar)) {
                         // Use shared helper for bullet style matching
-                        const bulletToInsert = findSiblingBulletByIndent(editor.document, position.line, line.firstNonWhitespaceCharacterIndex) || '• ';
+                        const indent = line.firstNonWhitespaceCharacterIndex;
+                        const bulletToInsert = getBulletStyleFromAdjacentLines(editor.document, position.line, indent, '• ');
                         await editor.edit(editBuilder => {
                             editBuilder.insert(position, bulletToInsert + typedChar);
                         });
@@ -157,11 +190,35 @@ export class CommandManager {
         const tabCommand = vscode.commands.registerTextEditorCommand('pointblank.tab', async (editor) => {
             // This command will only be executed when 'pointblank.atBulletStart' context is true,
             // as defined in package.json keybindings.
-            const position = editor.selection.active;
-            const line = editor.document.lineAt(position.line);
-            await editor.edit(editBuilder => {
-                editBuilder.insert(new vscode.Position(line.lineNumber, 0), '    ');
-            });
+            const selection = editor.selection;
+            if (selection.isSingleLine) {
+                const line = editor.document.lineAt(selection.active.line);
+                const lineText = line.text;
+                const indent = line.firstNonWhitespaceCharacterIndex;
+                // Find bullet (if any) at start of line
+                const bulletMatch = lineText.slice(indent).match(/^([*\-+•‣◦▪‣•·])\s+/);
+                if (bulletMatch) {
+                    // If at start of line or just after bullet, indent the bullet and text together
+                    const bulletEnd = indent + bulletMatch[0].length;
+                    if (selection.active.character === 0 || selection.active.character === bulletEnd) {
+                        // Always insert indent at position 0 (start of line), even if indent is 0
+                        await editor.edit(editBuilder => {
+                            editBuilder.insert(new vscode.Position(line.lineNumber, 0), '    ');
+                        });
+                        return;
+                    }
+                } else {
+                    // No bullet, just indent at start of line
+                    if (selection.active.character === 0) {
+                        await editor.edit(editBuilder => {
+                            editBuilder.insert(new vscode.Position(line.lineNumber, 0), '    ');
+                        });
+                        return;
+                    }
+                }
+            }
+            // Otherwise, fall back to default tab behavior (move text or selection)
+            await vscode.commands.executeCommand('tab');
         });
 
         // --- Other Command Registrations ---
@@ -169,7 +226,7 @@ export class CommandManager {
             vscode.commands.executeCommand('outdentLines');
         });
 
-        const pasteWithBulletsInstance = new PasteWithBullets(this.extensionState);
+        const pasteWithBulletsInstance = new PasteWithBullets();
         const pasteWithBulletsCommand = vscode.commands.registerTextEditorCommand('pointblank.pasteWithBullets', async () => {
             if (!config.getAutoBullets()) {
                 await vscode.commands.executeCommand('editor.action.clipboardPasteAction');
