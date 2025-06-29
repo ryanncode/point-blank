@@ -16,3 +16,4 @@ docs/**
 notes/**
 PRD.md
 pnpm-lock.yaml
+jest.config.js
