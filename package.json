@@ -35,15 +35,18 @@
       },
       {
         "command": "pointblank.expandTemplate",
-        "title": "Point Blank: Expand Template Inline"
+        "title": "Point Blank: Expand Template Inline",
+        "commandPalette": false
       },
       {
         "command": "pointblank.tab",
-        "title": "Point Blank: Handle Tab Key"
+        "title": "Point Blank: Handle Tab Key",
+        "commandPalette": false
       },
       {
         "command": "pointblank.enterKey",
-        "title": "Point Blank: Handle Enter Key"
+        "title": "Point Blank: Handle Enter Key",
+        "commandPalette": false
       },
       {
         "command": "pointblank.insertTypeQuery",
