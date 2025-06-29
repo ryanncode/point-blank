@@ -3,12 +3,16 @@
 All notable changes to the "pointblank" extension will be documented in this file.
 
 ## [0.6.4] - 2025-06-27
-### Fixed
-- Pasting a bullet at the beginning of a line no longer erases the line; pasted content is merged or inserted intelligently.
-- Numbered list items will remove their default bullet point.
 ### Added
 - You can now select a single-line bullet point for copying, making it easier to duplicate or move bullet items.
 - When typing or pasting from the start of a list item line, the bullet point style now matches the next or previous list item line at the same level of indent for consistency.
+### Fixed
+- Pasting a bullet at the beginning of a line no longer erases the line; pasted content is merged or inserted intelligently.
+- Numbered list items will remove their default bullet point.
+- Paste handling is now more robust: bullets are correctly added when pasting at the start of indented lines, and never in the middle of a line.
+### Testing
+- Added a comprehensive unit test for paste scenarios.
+- All parsing and paste logic is now tested using Jest unit tests.
 
 ## [0.6.3] - 2025-06-27
 ### Fixed
@@ -37,10 +41,10 @@ All notable changes to the "pointblank" extension will be documented in this fil
 - Support for optional YAML front matter in template files for extended metadata (used in quick open file type, though not used in inline expansion).
 
 ## [0.5.1] - 2025-06-15
-### Added
-- When creating a new bullet point, it will now inherit the style of the previous line.
 ### Changed
 - Updated and clarified the names of color-related settings.
+### Added
+- When creating a new bullet point, it will now inherit the style of the previous line.
 ### Fixed
 - Resolved widescreen layout issues on the website.
 
@@ -69,8 +73,8 @@ All notable changes to the "pointblank" extension will be documented in this fil
 - Introduced a quick-open command for template files.
 
 ## [0.1.0] - 2025-06-10
+### Changed
+- **Major Refactor**: Switched to a tree-node document model, laying the foundation for hierarchical outlining and structured data.
 ### Added
 - Initial implementation of styled bullet point prefixes.
 - Support for `key::value` pairs and node type templating.
-### Changed
-- **Major Refactor**: Switched to a tree-node document model, laying the foundation for hierarchical outlining and structured data.
