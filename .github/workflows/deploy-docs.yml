@@ -23,7 +23,7 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '2.7.1' # Or your Jekyll's required Ruby version
+          ruby-version: '3.1.0' # Or your Jekyll's required Ruby version
           bundler-cache: true
           # Set the cache path to be relative to the docs directory
           cache-version: 1 
