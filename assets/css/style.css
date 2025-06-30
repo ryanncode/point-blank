@@ -1,0 +1,52 @@
+:root { --background-color: #22272e; /* Dark background */ --text-color: #adbac7; /* Light grey text */ --primary-color: #80cbc4; /* Light teal for links/accents */ --hover-color: #b2dfdb; /* Lighter teal for hover */ --secondary-text-color: #808080; /* Blockquote/secondary text */ --border-color: #444c56; /* Subtle border for elements */ --header-bg: #2d333b; /* Slightly lighter dark for header */ --footer-bg: #2d333b; /* Slightly lighter dark for footer */ }
+
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji"; margin: 0; padding: 0; background-color: var(--background-color); color: var(--text-color); line-height: 1.6; }
+
+header { background-color: var(--header-bg); color: #fff; padding: 1.5em 20px; /* Added horizontal padding */ text-align: center; border-bottom: 1px solid var(--border-color); /* For mobile, allow flex items to wrap */ display: flex; flex-direction: column; align-items: center; }
+
+header h1 { margin: 0; font-size: 2em; }
+
+nav ul { padding: 0; list-style: none; display: flex; flex-wrap: wrap; /* Allow items to wrap to the next line */ justify-content: center; margin-top: 1.5em; /* Increased margin to prevent overlap */ }
+
+nav ul li { margin: 0 20px; }
+
+main { padding: 40px 20px; background-color: #2d333b; /* Slightly lighter dark for content area */ border-radius: 6px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); margin: 20px; /* Add margin to main content for smaller screens */ }
+
+section { margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px dashed var(--border-color); }
+
+section:last-child { border-bottom: none; }
+
+h2 { color: var(--primary-color); border-bottom: 2px solid var(--border-color); padding-bottom: 10px; margin-top: 0; font-size: 1.8em; }
+
+h3 { color: var(--text-color); font-size: 1.4em; margin-top: 25px; }
+
+p, ul, ol { margin-bottom: 1em; }
+
+code { background-color: #3e4451; color: #adbac7; border-radius: 3px; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace; word-break: break-word; white-space: pre-wrap; }
+
+pre { background: #2d333b; color: #adbac7; border-radius: 6px; padding: 1em; overflow-x: auto; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace; white-space: pre-wrap; word-break: break-word; box-sizing: border-box; max-width: 100%; }
+
+/* Apply padding only to inline code, not code within pre blocks */
+code:not(pre > code) { padding: 0.2em 0.4em; white-space: break-spaces; }
+
+/* Responsive fix for code/pre blocks on small screens */
+@media (max-width: 768px) { pre, code { white-space: pre-wrap; word-break: break-word; font-size: 0.95em; max-width: 100%; box-sizing: border-box; } }
+/* Global link styles for readability */
+a, a:visited { color: var(--primary-color); text-decoration: none; }
+
+a:hover { text-decoration: underline; color: var(--hover-color); }
+
+footer { text-align: center; padding: 25px; background-color: var(--footer-bg); color: var(--secondary-text-color); border-top: 1px solid var(--border-color); }
+
+.container { max-width: 1000px; margin: 0 auto; padding: 0 15px; /* Add horizontal padding for smaller screens */ }
+
+/* Media queries for responsiveness */
+@media (max-width: 768px) { header { padding: 1em 15px; /* Adjust header padding for smaller screens */ }
+  header h1 { font-size: 1.8em; }
+  nav ul { flex-direction: column; /* Stack navigation items vertically */ margin-top: 1em; }
+  nav ul li { margin: 10px 0; /* Adjust margin for stacked items */ }
+  main { padding: 20px 15px; /* Adjust main content padding for smaller screens */ margin: 15px; }
+  .container { padding: 0 10px; /* Further reduce container padding on very small screens */ } }
+@media (max-width: 480px) { header h1 { font-size: 1.5em; }
+  nav ul li { margin: 8px 0; }
+  main { padding: 15px 10px; margin: 10px; } }

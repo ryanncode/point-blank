@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Queries - Point Blank Documentation</title>
+    <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+    <h1>Point Blank Documentation</h1>
+    <nav>
+        <ul>
+            <li><a href="/index.html">Home</a></li>
+            <li><a href="/features.html">Features</a></li>
+            <li><a href="/queries.html">Queries</a></li>
+            <li><a href="/commands.html">Commands</a></li>
+            <li><a href="/settings.html">Settings</a></li>
+            <li><a href="/architecture.html">Architecture</a></li>
+            <li><a href="/contributing.html">Contributing</a></li>
+        </ul>
+    </nav>
+</header>
+        <main>
+            <h1 id="queries">Queries</h1>
+
+<p>Point Blank’s inline query language allows you to search for and list files or specific blocks of content within your notes. This powerful feature helps you quickly find relevant information based on defined properties.</p>
+
+<h2 id="query-syntax">Query Syntax</h2>
+
+<p>The general syntax for a query is as follows:</p>
+
+<p><code class="language-plaintext highlighter-rouge">LIST FROM [FILES|BLOCKS] [IN this.file|this.folder|workspace] WHERE &lt;conditions&gt; SORT BY &lt;key&gt; [ASC|DESC]</code></p>
+
+<h3 id="list-from-filesblocks"><code class="language-plaintext highlighter-rouge">LIST FROM [FILES|BLOCKS]</code></h3>
+
+<p>This clause specifies what you want to list:</p>
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">FILES</code>: Returns a list of file paths that match your criteria.</li>
+  <li><code class="language-plaintext highlighter-rouge">BLOCKS</code>: Returns a list of links to specific content blocks within files that match your criteria. These links are formatted as <code class="language-plaintext highlighter-rouge">[[relative/path#header]]</code> or <code class="language-plaintext highlighter-rouge">[[relative/path]]</code> if no preceding header is found.</li>
+</ul>
+
+<h3 id="in-thisfilethisfolderworkspace"><code class="language-plaintext highlighter-rouge">IN [this.file|this.folder|workspace]</code></h3>
+
+<p>This optional clause defines the scope of your search:</p>
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">this.file</code>: Searches only within the currently active file.</li>
+  <li><code class="language-plaintext highlighter-rouge">this.folder</code>: Searches within the folder containing the current file, including all its subfolders.</li>
+  <li><code class="language-plaintext highlighter-rouge">workspace</code>: Searches across your entire VS Code workspace (this is the default if no <code class="language-plaintext highlighter-rouge">IN</code> clause is specified).</li>
+</ul>
+
+<h3 id="where-conditions"><code class="language-plaintext highlighter-rouge">WHERE &lt;conditions&gt;</code></h3>
+
+<p>This optional clause allows you to filter results based on property values. Conditions are applied to the <code class="language-plaintext highlighter-rouge">Key:: Value</code> pairs found in your files or blocks.</p>
+
+<ul>
+  <li><strong>Operators:</strong>
+    <ul>
+      <li><code class="language-plaintext highlighter-rouge">=</code>: Equality (e.g., <code class="language-plaintext highlighter-rouge">Status = "Done"</code>)</li>
+      <li><code class="language-plaintext highlighter-rouge">!=</code>: Not equal to (e.g., <code class="language-plaintext highlighter-rouge">Priority != "Low"</code>)</li>
+      <li><code class="language-plaintext highlighter-rouge">&gt;</code>: Greater than (for numeric or date comparisons, e.g., <code class="language-plaintext highlighter-rouge">Date &gt; "2024-01-01"</code>)</li>
+      <li><code class="language-plaintext highlighter-rouge">&lt;</code>: Less than (for numeric or date comparisons, e.g., <code class="language-plaintext highlighter-rouge">Version &lt; 1.0</code>)</li>
+      <li><code class="language-plaintext highlighter-rouge">::</code>: Existence check (e.g., <code class="language-plaintext highlighter-rouge">Type::</code> checks if the <code class="language-plaintext highlighter-rouge">Type</code> property exists, regardless of its value).</li>
+    </ul>
+  </li>
+  <li><strong>Conjunctions:</strong>
+    <ul>
+      <li><code class="language-plaintext highlighter-rouge">AND</code>: All conditions must be true.</li>
+      <li><code class="language-plaintext highlighter-rouge">OR</code>: At least one condition must be true.</li>
+    </ul>
+  </li>
+</ul>
+
+<p><strong>Important Note on Grouping:</strong> The query parser currently supports chaining multiple conditions with a single <code class="language-plaintext highlighter-rouge">AND</code> or <code class="language-plaintext highlighter-rouge">OR</code> conjunction. <strong>Parentheses <code class="language-plaintext highlighter-rouge">()</code> for grouping complex <code class="language-plaintext highlighter-rouge">WHERE</code> clauses (e.g., <code class="language-plaintext highlighter-rouge">WHERE A AND (B OR C)</code>) are NOT supported.</strong> If you need to combine <code class="language-plaintext highlighter-rouge">AND</code> and <code class="language-plaintext highlighter-rouge">OR</code> logic, you may need to run separate queries or refine your data structure.</p>
+
+<h3 id="sort-by-key-ascdesc"><code class="language-plaintext highlighter-rouge">SORT BY &lt;key&gt; [ASC|DESC]</code></h3>
+
+<p>This optional clause allows you to sort your results based on a property key.</p>
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">&lt;key&gt;</code>: The property name to sort by (e.g., <code class="language-plaintext highlighter-rouge">DueDate</code>, <code class="language-plaintext highlighter-rouge">Priority</code>).</li>
+  <li><code class="language-plaintext highlighter-rouge">ASC</code>: Ascending order (A-Z, 0-9, oldest to newest). This is the default.</li>
+  <li><code class="language-plaintext highlighter-rouge">DESC</code>: Descending order (Z-A, 9-0, newest to oldest).</li>
+</ul>
+
+<h2 id="query-examples">Query Examples</h2>
+
+<p>Here are several examples demonstrating the use of the query language:</p>
+
+<h3 id="basic-queries">Basic Queries</h3>
+
+<ol>
+  <li><strong>List all files tagged as “Meeting” in the workspace:</strong>
+    <div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>LIST FROM FILES WHERE Type = "Meeting"
+</code></pre></div>    </div>
+  </li>
+  <li><strong>List all “Task” blocks in the workspace:</strong>
+    <div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>LIST FROM BLOCKS WHERE Type = "Task"
+</code></pre></div>    </div>
+  </li>
+</ol>
+
+<h3 id="scoped-queries">Scoped Queries</h3>
+
+<ol>
+  <li><strong>Find all “Idea” blocks within the current file:</strong>
+    <div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>LIST FROM BLOCKS IN this.file WHERE Type = "Idea"
+</code></pre></div>    </div>
+  </li>
+  <li><strong>List all “Project” files within the current folder (and its subfolders):</strong>
+    <div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>LIST FROM FILES IN this.folder WHERE Type = "Project"
+</code></pre></div>    </div>
+  </li>
+</ol>
+
+<h3 id="filtered-queries">Filtered Queries</h3>
+
+<ol>
+  <li><strong>List all “Task” blocks with “High” priority:</strong>
+    <div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>LIST FROM BLOCKS WHERE Type = "Task" AND Priority = "High"
+</code></pre></div>    </div>
+  </li>
+  <li><strong>List all “Task” blocks that are not “Done”:</strong>
+    <div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>LIST FROM BLOCKS WHERE Type = "Task" AND Status != "Done"
+</code></pre></div>    </div>
+  </li>
+  <li><strong>Find all “Meeting” blocks that occurred after January 1, 2024:</strong>
+    <div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>LIST FROM BLOCKS WHERE Type = "Meeting" AND Date &gt; "2024-01-01"
+</code></pre></div>    </div>
+  </li>
+  <li><strong>List all “Task” blocks that are either “Pending” or “In Progress”:</strong>
+    <div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>LIST FROM BLOCKS WHERE Type = "Task" AND Status = "Pending" OR Status = "In Progress"
+</code></pre></div>    </div>
+  </li>
+</ol>
+
+<h3 id="sorted-queries">Sorted Queries</h3>
+
+<ol>
+  <li><strong>List all incomplete “Task” blocks, sorted by <code class="language-plaintext highlighter-rouge">DueDate</code> in ascending order:</strong>
+    <div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>LIST FROM BLOCKS WHERE Type = "Task" AND Status != "Done" SORT BY DueDate ASC
+</code></pre></div>    </div>
+  </li>
+  <li><strong>List all “Project” files, sorted by <code class="language-plaintext highlighter-rouge">Modified</code> date in descending order:</strong>
+    <div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>LIST FROM FILES WHERE Type = "Project" SORT BY Modified DESC
+</code></pre></div>    </div>
+  </li>
+</ol>
+
+<h3 id="complex-queries-combining-clauses">Complex Queries (Combining Clauses)</h3>
+
+<ol>
+  <li><strong>List all high-priority, incomplete “Task” blocks in the current folder, sorted by <code class="language-plaintext highlighter-rouge">DueDate</code>:</strong>
+```
+LIST FROM BLOCKS IN this.folder WHERE Type = “Task” AND Priority = “High” AND Status != “Done” SORT BY DueDate ASC</li>
+</ol>
+
+<h2 id="running-queries">Running Queries</h2>
+
+<p>There are two primary ways to execute queries in Point Blank: manually writing query blocks or using commands from the Command Palette.</p>
+
+<h3 id="manual-workflow">Manual Workflow</h3>
+
+<p>You can write queries directly in your markdown files. The query engine identifies queries by a special HTML comment.</p>
+
+<ol>
+  <li><strong>Write the Query:</strong> Type your query inside a comment block like this:
+    <div class="language-markdown highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c">&lt;!-- pointblank:query LIST FROM BLOCKS WHERE Type = "Task" AND Status = "Pending" --&gt;</span>
+</code></pre></div>    </div>
+  </li>
+  <li><strong>Execute the Query:</strong> Place your cursor anywhere in the file and run the <strong><code class="language-plaintext highlighter-rouge">Point Blank: Update Query</code></strong> command from the VS Code Command Palette (<code class="language-plaintext highlighter-rouge">Ctrl+Shift+P</code>). The extension will find the nearest query block (searching down from the cursor), execute it, and insert the results directly above the comment block.</li>
+</ol>
+
+<h3 id="using-commands">Using Commands</h3>
+
+<p>Point Blank provides commands to simplify the process of creating and updating queries.</p>
+
+<ul>
+  <li><strong><code class="language-plaintext highlighter-rouge">Point Blank: Insert Query by Type</code></strong> (<code class="language-plaintext highlighter-rouge">pointblank.insertTypeQuery</code>)
+    <ul>
+      <li>This command will prompt you to enter a <code class="language-plaintext highlighter-rouge">Type</code> name (e.g., “Task”, “Note”).</li>
+      <li>It will then insert a complete query block into the editor, ready to be executed.</li>
+      <li>Example Query Inserted: <code class="language-plaintext highlighter-rouge">LIST FROM BLOCKS WHERE Type::Task</code></li>
+    </ul>
+  </li>
+  <li><strong><code class="language-plaintext highlighter-rouge">Point Blank: Update Query</code></strong> (<code class="language-plaintext highlighter-rouge">pointblank.updateTypeQuery</code>)
+    <ul>
+      <li>This command searches for the nearest query block below your cursor’s current position.</li>
+      <li>It re-runs the query and replaces the old results with the new ones. This is useful for refreshing a list after you’ve made changes to your notes.</li>
+    </ul>
+  </li>
+</ul>
+
+<h2 id="command-reference">Command Reference</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Command</th>
+      <th style="text-align: left">ID</th>
+      <th style="text-align: left">Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left">Insert Query by Type</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">pointblank.insertTypeQuery</code></td>
+      <td style="text-align: left">Prompts for a type and inserts a new query block.</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Update Query</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">pointblank.updateTypeQuery</code></td>
+      <td style="text-align: left">Updates the results of the nearest query block.</td>
+    </tr>
+  </tbody>
+</table>
+
+        </main>
+        <footer>
+            <p>&copy; 2025 Point Blank. All rights reserved.</p>
+        </footer>
+    </div>
+    <script src="/assets/js/main.js"></script>
+</body>
+</html>
