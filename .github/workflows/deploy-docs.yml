@@ -1,0 +1,37 @@
+name: Build and Deploy Jekyll Site from /docs
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/**'  # This correctly triggers the workflow only when docs changes
+  workflow_dispatch:
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '2.7.1' # Or your Jekyll's required Ruby version
+          bundler-cache: true
+          # Set the cache path to be relative to the docs directory
+          cache-version: 1 
+          working-directory: './docs'
+
+      - name: Build the site
+        # This command now runs inside the ./docs directory
+        run: bundle exec jekyll build
+        working-directory: ./docs
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # The publish directory is now ./docs/_site
+          publish_dir: ./docs/_site
