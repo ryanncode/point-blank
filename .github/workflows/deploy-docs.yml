@@ -6,7 +6,12 @@ on:
       - main
     paths:
       - 'docs/**'  # This correctly triggers the workflow only when docs changes
+      - '.github/workflows/deploy-docs.yml'
   workflow_dispatch:
+
+# Add this permissions block
+permissions:
+  contents: write
 
 jobs:
   build_and_deploy:
