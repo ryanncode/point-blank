@@ -2,7 +2,6 @@ import * as vscode from 'vscode';
 import { BlockNode } from './blockNode';
 import { DocumentTree } from './documentTree';
 import { isExcludedLine } from '../decorations/lineFilters';
-import { withTiming } from '../utils/debugUtils';
 
 /**
  * A stateless parser responsible for transforming a `vscode.TextDocument` into an
@@ -17,11 +16,9 @@ export class DocumentParser {
      * @returns A new `DocumentTree` representing the entire document.
      */
     public fullParse(document: vscode.TextDocument): DocumentTree {
-        return withTiming(() => {
-            const flatNodes = this.createFlatNodeList(document);
-            const rootNodes = this.buildTreeFromFlatList(flatNodes);
-            return DocumentTree.create(document, rootNodes);
-        }, `DocumentParser.fullParse`);
+        const flatNodes = this.createFlatNodeList(document);
+        const rootNodes = this.buildTreeFromFlatList(flatNodes);
+        return DocumentTree.create(document, rootNodes);
     }
 
     /**
@@ -34,57 +31,55 @@ export class DocumentParser {
      * @returns A new `DocumentTree` reflecting the applied changes.
      */
     public parse(previousTree: DocumentTree, changes: readonly vscode.TextDocumentContentChangeEvent[], document: vscode.TextDocument): DocumentTree {
-        return withTiming(() => {
-            if (changes.length === 0 || previousTree.rootNodes.length === 0) {
-                return this.fullParse(document);
-            }
+        if (changes.length === 0 || previousTree.rootNodes.length === 0) {
+            return this.fullParse(document);
+        }
 
-            // 1. Find the range of lines affected by the change in the *old* document.
-            const { oldStartLine, oldEndLine } = this.getOldChangeRange(changes);
+        // 1. Find the range of lines affected by the change in the *old* document.
+        const { oldStartLine, oldEndLine } = this.getOldChangeRange(changes);
 
-            // 2. Find the top-level root nodes that contain the start and end of the change.
-            let firstDirtyRootIndex = this.findRootNodeIndexAtLine(previousTree, oldStartLine);
+        // 2. Find the top-level root nodes that contain the start and end of the change.
+        let firstDirtyRootIndex = this.findRootNodeIndexAtLine(previousTree, oldStartLine);
 
-            // If we can't find the nodes, it's safer to do a full re-parse.
-            if (firstDirtyRootIndex === -1) {
-                return this.fullParse(document);
-            }
+        // If we can't find the nodes, it's safer to do a full re-parse.
+        if (firstDirtyRootIndex === -1) {
+            return this.fullParse(document);
+        }
 
-            // Expand the dirty range to include the previous root node.
-            // This is necessary to correctly handle cases where a node is indented
-            // and becomes a child of the previous node.
-            if (firstDirtyRootIndex > 0) {
-                firstDirtyRootIndex--;
-            }
+        // Expand the dirty range to include the previous root node.
+        // This is necessary to correctly handle cases where a node is indented
+        // and becomes a child of the previous node.
+        if (firstDirtyRootIndex > 0) {
+            firstDirtyRootIndex--;
+        }
 
-            let lastDirtyRootIndex = this.findRootNodeIndexAtLine(previousTree, oldEndLine);
+        let lastDirtyRootIndex = this.findRootNodeIndexAtLine(previousTree, oldEndLine);
 
-            // If we can't find the nodes, it's safer to do a full re-parse.
-            if (lastDirtyRootIndex === -1) {
-                // If the end of the change is outside any node, re-parse to the end.
-                lastDirtyRootIndex = previousTree.rootNodes.length - 1;
-            }
+        // If we can't find the nodes, it's safer to do a full re-parse.
+        if (lastDirtyRootIndex === -1) {
+            // If the end of the change is outside any node, re-parse to the end.
+            lastDirtyRootIndex = previousTree.rootNodes.length - 1;
+        }
 
-            // 3. Determine the text range in the *new* document to re-parse.
-            const firstDirtyNode = previousTree.rootNodes[firstDirtyRootIndex];
-            const lastDirtyNode = previousTree.rootNodes[lastDirtyRootIndex];
-            const lineDelta = document.lineCount - previousTree.document.lineCount;
-            const newReparseStartLine = firstDirtyNode.lineNumber;
-            const newReparseEndLine = lastDirtyNode.getSelfAndDescendants().reduce((max, n) => Math.max(max, n.lineNumber), 0) + lineDelta;
+        // 3. Determine the text range in the *new* document to re-parse.
+        const firstDirtyNode = previousTree.rootNodes[firstDirtyRootIndex];
+        const lastDirtyNode = previousTree.rootNodes[lastDirtyRootIndex];
+        const lineDelta = document.lineCount - previousTree.document.lineCount;
+        const newReparseStartLine = firstDirtyNode.lineNumber;
+        const newReparseEndLine = lastDirtyNode.getSelfAndDescendants().reduce((max, n) => Math.max(max, n.lineNumber), 0) + lineDelta;
 
-            // 4. Re-parse only that block of text.
-            const newFlatNodes = this.createFlatNodeList(document, newReparseStartLine, newReparseEndLine + 1);
-            const newSubtreeRoots = this.buildTreeFromFlatList(newFlatNodes);
+        // 4. Re-parse only that block of text.
+        const newFlatNodes = this.createFlatNodeList(document, newReparseStartLine, newReparseEndLine + 1);
+        const newSubtreeRoots = this.buildTreeFromFlatList(newFlatNodes);
 
-            // 5. Splice the new nodes into the old list of root nodes.
-            const newRootNodes = [
-                ...previousTree.rootNodes.slice(0, firstDirtyRootIndex),
-                ...newSubtreeRoots,
-                ...previousTree.rootNodes.slice(lastDirtyRootIndex + 1)
-            ];
+        // 5. Splice the new nodes into the old list of root nodes.
+        const newRootNodes = [
+            ...previousTree.rootNodes.slice(0, firstDirtyRootIndex),
+            ...newSubtreeRoots,
+            ...previousTree.rootNodes.slice(lastDirtyRootIndex + 1)
+        ];
 
-            return DocumentTree.create(document, newRootNodes);
-        }, `DocumentParser.parse`);
+        return DocumentTree.create(document, newRootNodes);
     }
 
     private findRootNodeIndexAtLine(tree: DocumentTree, lineNumber: number): number {
@@ -113,31 +108,29 @@ export class DocumentParser {
      * @returns An array of `BlockNode`s.
      */
     private createFlatNodeList(document: vscode.TextDocument, startLine: number = 0, endLine: number = document.lineCount): BlockNode[] {
-        return withTiming(() => {
-            const nodes: BlockNode[] = [];
-            let inCodeBlock = false;
-            for (let i = startLine; i < endLine; i++) {
-                const line = document.lineAt(i);
-                if (!line) {
-                    continue; // Add a guard for lines that might not exist in a transient state
-                }
-                const isDelimiter = line.text.trim().startsWith('```');
-                let isExcluded = isExcludedLine(line);
-                if (isDelimiter) {
-                    inCodeBlock = !inCodeBlock;
-                }
-                isExcluded = isExcluded || (inCodeBlock && !isDelimiter);
-
-                // Skip empty or whitespace-only lines from being part of the tree,
-                // but only if they are not inside a code block.
-                if (line.isEmptyOrWhitespace && !inCodeBlock) {
-                    continue;
-                }
-
-                nodes.push(new BlockNode(line, i, isExcluded));
+        const nodes: BlockNode[] = [];
+        let inCodeBlock = false;
+        for (let i = startLine; i < endLine; i++) {
+            const line = document.lineAt(i);
+            if (!line) {
+                continue; // Add a guard for lines that might not exist in a transient state
             }
-            return nodes;
-        }, `createFlatNodeList for lines ${startLine}-${endLine}`);
+            const isDelimiter = line.text.trim().startsWith('```');
+            let isExcluded = isExcludedLine(line);
+            if (isDelimiter) {
+                inCodeBlock = !inCodeBlock;
+            }
+            isExcluded = isExcluded || (inCodeBlock && !isDelimiter);
+
+            // Skip empty or whitespace-only lines from being part of the tree,
+            // but only if they are not inside a code block.
+            if (line.isEmptyOrWhitespace && !inCodeBlock) {
+                continue;
+            }
+
+            nodes.push(new BlockNode(line, i, isExcluded));
+        }
+        return nodes;
     }
 
     /**
@@ -147,35 +140,33 @@ export class DocumentParser {
      * @returns An array of root `BlockNode`s.
      */
     private buildTreeFromFlatList(nodes: BlockNode[]): BlockNode[] {
-        return withTiming(() => {
-            if (nodes.length === 0) {
-                return [];
-            }
+        if (nodes.length === 0) {
+            return [];
+        }
 
-            const rootNodes: BlockNode[] = [];
-            const parentStack: BlockNode[] = []; // Stack of nodes to track hierarchy
+        const rootNodes: BlockNode[] = [];
+        const parentStack: BlockNode[] = []; // Stack of nodes to track hierarchy
 
-            for (const currentNode of nodes) {
-                while (parentStack.length > 0) {
-                    const parentNode = parentStack[parentStack.length - 1];
-                    if (currentNode.indent > parentNode.indent) {
-                        parentNode.addChild(currentNode.withParent(parentNode));
-                        break; // Found parent, break inner loop
-                    } else {
-                        parentStack.pop();
-                    }
-                }
-
-                if (parentStack.length === 0) {
-                    rootNodes.push(currentNode);
-                }
-
-                if (!currentNode.isExcluded) {
-                    parentStack.push(currentNode);
+        for (const currentNode of nodes) {
+            while (parentStack.length > 0) {
+                const parentNode = parentStack[parentStack.length - 1];
+                if (currentNode.indent > parentNode.indent) {
+                    parentNode.addChild(currentNode.withParent(parentNode));
+                    break; // Found parent, break inner loop
+                } else {
+                    parentStack.pop();
                 }
             }
 
-            return rootNodes;
-        }, `buildTreeFromFlatList for ${nodes.length} nodes`);
+            if (parentStack.length === 0) {
+                rootNodes.push(currentNode);
+            }
+
+            if (!currentNode.isExcluded) {
+                parentStack.push(currentNode);
+            }
+        }
+
+        return rootNodes;
     }
 }

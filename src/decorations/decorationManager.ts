@@ -5,7 +5,6 @@ import { DecorationCalculator } from './decorationCalculator';
 import { debounce } from '../utils/debounce';
 import { Configuration } from '../config/configuration';
 import { ExtensionState } from '../state/extensionState';
-import { withTiming } from '../utils/debugUtils';
 
 /**
  * Manages the application of text editor decorations. It orchestrates decoration updates
@@ -15,7 +14,7 @@ import { withTiming } from '../utils/debugUtils';
 export class DecorationManager implements vscode.Disposable {
     private _decorationTypes: Map<string, vscode.TextEditorDecorationType> = new Map();
     private _disposables: vscode.Disposable[] = [];
-private _debouncedUpdate: (editor: vscode.TextEditor, tree: DocumentTree) => void;
+    private _debouncedUpdate: (editor: vscode.TextEditor, tree: DocumentTree) => void;
     private _extensionState: ExtensionState;
 
     constructor(extensionState: ExtensionState) {
@@ -93,17 +92,15 @@ private _debouncedUpdate: (editor: vscode.TextEditor, tree: DocumentTree) => voi
      * @param tree The current `DocumentTree`.
      */
     private applyDecorations(editor: vscode.TextEditor, tree: DocumentTree): void {
-        withTiming(() => {
-            const decorationsToApply = new Map<string, vscode.DecorationOptions[]>();
-            this._decorationTypes.forEach((_, key) => decorationsToApply.set(key, []));
+        const decorationsToApply = new Map<string, vscode.DecorationOptions[]>();
+        this._decorationTypes.forEach((_, key) => decorationsToApply.set(key, []));
 
         const nodesToDecorate = this.getNodesInViewport(editor, tree);
         DecorationCalculator.calculateDecorations(nodesToDecorate, decorationsToApply);
 
-            this._decorationTypes.forEach((decorationType, typeName) => {
-                editor.setDecorations(decorationType, decorationsToApply.get(typeName) || []);
-            });
-        }, `Decoration rendering for ${editor.document.uri.fsPath}`);
+        this._decorationTypes.forEach((decorationType, typeName) => {
+            editor.setDecorations(decorationType, decorationsToApply.get(typeName) || []);
+        });
     }
 
     /**

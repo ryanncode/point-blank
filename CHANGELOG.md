@@ -8,12 +8,14 @@ All notable changes to the "pointblank" extension will be documented in this fil
 - When typing or pasting from the start of a list item line, the bullet point style now matches the next or previous list item line at the same level of indent for consistency.
 ### Changed
 - Replaced the document parser with a high-performance "Dirty Range" incremental parser, eliminating typing lag in large documents.
+- Paste operations are now handled as a single, atomic transaction. This prevents potential race conditions with the incremental parser and ensures that the document state remains consistent, improving performance and reliability, especially for large pastes.
 ### Fixed
+- Fixed an issue where automatic bullet insertion would interfere with VS Code's auto-completion for brackets, parentheses, and quotes.
 - Pasting a bullet at the beginning of a line no longer erases the line; pasted content is merged or inserted intelligently.
 - Numbered list items will remove their default bullet point.
 - Paste handling is now more robust: bullets are correctly added when pasting at the start of indented lines, and never in the middle of a line.
 ### Testing
-- Added a comprehensive unit test for paste scenarios.
+- Added comprehensive unit tests for document parsing and paste scenarios.
 - All parsing and paste logic is now tested using Jest unit tests.
 
 ## [0.6.3] - 2025-06-27

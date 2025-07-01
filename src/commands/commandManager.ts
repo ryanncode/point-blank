@@ -243,7 +243,7 @@ export class CommandManager {
             vscode.commands.executeCommand('outdentLines');
         });
 
-        const pasteWithBulletsInstance = new PasteWithBullets();
+        const pasteWithBulletsInstance = new PasteWithBullets(this.extensionState);
         const pasteWithBulletsCommand = vscode.commands.registerTextEditorCommand('pointblank.pasteWithBullets', async () => {
             if (!config.getAutoBullets()) {
                 await vscode.commands.executeCommand('editor.action.clipboardPasteAction');
