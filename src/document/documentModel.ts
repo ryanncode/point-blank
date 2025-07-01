@@ -80,23 +80,18 @@ export class DocumentModel {
             return;
         }
 
-        // If a bulk update is in progress, defer incremental parsing until the bulk update completes.
         if (this._isBulkUpdating) {
             return;
         }
 
-        // Update the internal document reference to the latest version
         this._document = event.document;
 
-        this._isParsing = true; // Set parsing flag
-        // Create a new, updated tree by applying the changes to the previous tree.
-        const newDocumentTree = this._parser.parse(this._documentTree, event.contentChanges);
+        this._isParsing = true;
+        const newDocumentTree = this._parser.parse(this._documentTree, event.contentChanges, this._document);
         this._documentTree = newDocumentTree;
-        this._isParsing = false; // Clear parsing flag
-        this._onDidParseEventEmitter.fire(); // Fire event
+        this._isParsing = false;
+        this._onDidParseEventEmitter.fire();
 
-        // Notify the DecorationManager with the new tree. The manager will then
-        // handle the debounced update of the actual decorations in the editor.
         this._decorationManager.updateDecorations(this._documentTree);
     }
 

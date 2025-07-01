@@ -2,10 +2,12 @@
 
 All notable changes to the "pointblank" extension will be documented in this file.
 
-## [0.6.4] - 2025-06-27
+## [0.7.0] - 2025-06-29
 ### Added
 - You can now select a single-line bullet point for copying, making it easier to duplicate or move bullet items.
 - When typing or pasting from the start of a list item line, the bullet point style now matches the next or previous list item line at the same level of indent for consistency.
+### Changed
+- Replaced the document parser with a high-performance "Dirty Range" incremental parser, eliminating typing lag in large documents.
 ### Fixed
 - Pasting a bullet at the beginning of a line no longer erases the line; pasted content is merged or inserted intelligently.
 - Numbered list items will remove their default bullet point.

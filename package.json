@@ -7,7 +7,7 @@
     "type": "git",
     "url": "https://github.com/ryanncode/point-blank"
   },
-  "version": "0.6.4",
+  "version": "0.7.0",
   "engines": {
     "vscode": "^1.100.0"
   },
@@ -179,7 +179,7 @@
         {
           "command": "pointblank.enterKey",
           "when": "false"
-    }
+        }
       ]
     }
   },
@@ -193,7 +193,8 @@
     "pretest": "pnpm run compile-tests && pnpm run compile && pnpm run lint",
     "lint": "eslint src --ext ts",
     "test": "vscode-test",
-    "test:paste": "jest test/pasteUtils.test.ts"
+    "test:paste": "jest test/pasteUtils.test.ts",
+    "test:parse": "jest test/documentParser.test.ts"
   },
   "devDependencies": {
     "@types/glob": "^8.1.0",
@@ -207,6 +208,7 @@
     "@vscode/test-electron": "^2.5.2",
     "eslint": "^9.25.1",
     "glob": "^8.1.0",
+    "identity-obj-proxy": "^3.0.0",
     "jest": "^30.0.3",
     "ts-jest": "^29.4.0",
     "ts-loader": "^9.5.2",

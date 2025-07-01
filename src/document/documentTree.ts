@@ -11,9 +11,9 @@ export class DocumentTree {
     public readonly document: vscode.TextDocument;
 
     // A map for O(1) lookup of nodes by their line number.
-    private readonly _nodesByLine: Map<number, BlockNode>;
+    private _nodesByLine: Map<number, BlockNode>;
     // A sorted array of all nodes for efficient range-based lookups.
-    private readonly _allNodesSorted: readonly BlockNode[];
+    private _allNodesSorted: BlockNode[];
 
     private constructor(document: vscode.TextDocument, rootNodes: BlockNode[]) {
         this.document = document;
@@ -23,12 +23,10 @@ export class DocumentTree {
         // Populate the lookup map and the sorted array in a single traversal.
         const allNodes: BlockNode[] = [];
         const stack: BlockNode[] = [...rootNodes].reverse(); // Use reverse for depth-first traversal order.
-
         while (stack.length > 0) {
             const node = stack.pop()!;
             allNodes.push(node);
             this._nodesByLine.set(node.lineNumber, node);
-            // Add children to the stack in reverse order to maintain correct traversal.
             for (let i = node.children.length - 1; i >= 0; i--) {
                 stack.push(node.children[i]);
             }

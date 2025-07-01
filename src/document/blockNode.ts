@@ -28,6 +28,8 @@ export class BlockNode {
     public readonly type?: string;
     public readonly typedNodeRange?: vscode.Range;
     public readonly isCodeBlockDelimiter: boolean;
+    public parent: BlockNode | undefined;
+    public children: BlockNode[];
     public readonly isExcluded: boolean;
     public readonly bulletType: 'star' | 'plus' | 'minus' | 'numbered' | 'blockquote' | 'default' | 'none' | 'atSign';
     public readonly bulletRange?: vscode.Range;
@@ -37,9 +39,9 @@ export class BlockNode {
     public readonly headerLevel?: number;
     public readonly headerText?: string;
 
-    // Hierarchy properties
-    public readonly parent?: BlockNode;
-    public readonly children: readonly BlockNode[];
+    get lineCount(): number {
+        return 1 + this.children.reduce((acc, child) => acc + child.lineCount, 0);
+    }
 
     constructor(
         line: vscode.TextLine,
@@ -54,7 +56,7 @@ export class BlockNode {
         this.indent = line.firstNonWhitespaceCharacterIndex;
         this.isExcluded = isExcluded;
         this.parent = parent;
-        this.children = children;
+        this.children = children || [];
 
         // Perform all parsing upon construction to ensure immutability.
         const { isKeyValue, keyValue, isTypedNode, type, typedNodeRange, isCodeBlockDelimiter, isHeader, headerLevel, headerText } = this.parseLineContent();
@@ -145,48 +147,37 @@ export class BlockNode {
     }
 
     /**
-     * Creates a new `BlockNode` instance with updated children.
-     * This method is essential for maintaining the immutability of the document tree.
-     * @param newChildren The new array of child nodes.
-     * @returns A new `BlockNode` instance.
+     * Creates a new `BlockNode` with the specified parent.
+     * @param parent The new parent for the node.
+     * @returns A new `BlockNode` with the specified parent.
      */
-    public withChildren(newChildren: BlockNode[]): BlockNode {
-        return new BlockNode(this.line, this.lineNumber, this.isExcluded, this.parent, newChildren);
+    public withParent(parent: BlockNode): BlockNode {
+        return new BlockNode(this.line, this.lineNumber, this.isExcluded, parent, this.children);
     }
 
     /**
-     * Creates a new `BlockNode` instance with an updated parent.
-     * @param newParent The new parent node.
-     * @returns A new `BlockNode` instance.
+     * Creates a new `BlockNode` with the specified children.
+     * @param children The new children for the node.
+     * @returns A new `BlockNode` with the specified children.
      */
-    public withParent(newParent?: BlockNode): BlockNode {
-        return new BlockNode(this.line, this.lineNumber, this.isExcluded, newParent, [...this.children]);
+    public withChildren(children: BlockNode[]): BlockNode {
+        return new BlockNode(this.line, this.lineNumber, this.isExcluded, this.parent, children);
     }
 
     /**
-     * Performs a shallow comparison to check if two `BlockNode`s have different content
-     * relevant to decoration. This is used to optimize re-rendering.
-     * @param otherNode The other `BlockNode` to compare against.
-     * @returns `true` if the content is different, `false` otherwise.
+     * Adds a child to this node. This method mutates the node.
+     * @param child The `BlockNode` to add as a child.
      */
-    public isContentDifferent(otherNode: BlockNode): boolean {
-        if (this.text !== otherNode.text ||
-            this.bulletType !== otherNode.bulletType ||
-            this.isKeyValue !== otherNode.isKeyValue ||
-            this.isTypedNode !== otherNode.isTypedNode ||
-            this.isHeader !== otherNode.isHeader ||
-            this.headerLevel !== otherNode.headerLevel ||
-            this.headerText !== otherNode.headerText) {
-            return true;
-        }
+    public addChild(child: BlockNode) {
+        this.children.push(child);
+        child.parent = this;
+    }
 
-        // Deep compare bulletRange only if necessary.
-        const range1 = this.bulletRange;
-        const range2 = otherNode.bulletRange;
-        if ((range1 && !range2) || (!range1 && range2) || (range1 && range2 && !range1.isEqual(range2))) {
-            return true;
+    public getSelfAndDescendants(): BlockNode[] {
+        const result: BlockNode[] = [this];
+        for (const child of this.children) {
+            result.push(...child.getSelfAndDescendants());
         }
-
-        return false;
+        return result;
     }
 }

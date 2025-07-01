@@ -10,7 +10,7 @@ title: Architecture
     <h3>Data Flow:</h3>
     <ol>
         <li>When a document is opened or modified, VS Code fires an event that is picked up by the <code>DocumentModel</code>.</li>
-        <li>The <code>DocumentModel</code> uses the <code>DocumentParser</code> to create or update the <code>DocumentTree</code>, an immutable, hierarchical representation of the document's text.</li>
+        <li>The <code>DocumentModel</code> uses the <code>DocumentParser</code> to create or update the <code>DocumentTree</code>, an immutable, hierarchical representation of the document's text. The parser uses a highly efficient "dirty range" incremental strategy to avoid performance bottlenecks in large files.</li>
         <li>The <code>DocumentModel</code> notifies the <code>DecorationManager</code> of the change.</li>
         <li>The <code>DecorationManager</code>, using debouncing and viewport-aware logic, retrieves the visible <code>BlockNode</code>s from the <code>DocumentTree</code>.</li>
         <li>It passes these nodes to the <code>DecorationCalculator</code>, which determines the appropriate decorations for each node based on its properties (e.g., <code>bulletType</code>).</li>
@@ -21,6 +21,9 @@ title: Architecture
 
     <h3>Immutable Document Model</h3>
     <p>The use of an immutable <code>DocumentTree</code> and <code>BlockNode</code>s is a cornerstone of the architecture. When the document changes, a new tree is created rather than modifying the old one. This provides predictability, simplifies state management, and makes the flow of data easy to trace.</p>
+
+    <h3>Performant Incremental Parsing</h3>
+    <p>To handle large documents without typing lag, Point Blank employs a "Dirty Range" incremental parser. Instead of performing a full re-parse on every keystroke, the parser identifies the minimal block of top-level nodes affected by a change, re-parses only that block, and splices the result back into the document tree. This ensures the UI remains responsive even in documents with thousands of lines.</p>
 
     <h3>Design Philosophy: Insertion vs. Styling</h3>
     <p>A critical distinction in Point Blank's architecture is the separation between one-time character <strong>insertion</strong> and continuous visual <strong>styling</strong>.</p>

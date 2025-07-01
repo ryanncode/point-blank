@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { BlockNode } from './blockNode';
 import { DocumentTree } from './documentTree';
-import { isExcludedLine } from '../decorations/lineFilters'; // Assuming this is still needed for initial exclusion
+import { isExcludedLine } from '../decorations/lineFilters';
 import { withTiming } from '../utils/debugUtils';
 
 /**
@@ -17,45 +17,92 @@ export class DocumentParser {
      * @returns A new `DocumentTree` representing the entire document.
      */
     public fullParse(document: vscode.TextDocument): DocumentTree {
-        const flatNodes = this.createFlatNodeList(document);
-        const rootNodes = this.buildTreeFromFlatList(flatNodes);
-        return DocumentTree.create(document, rootNodes);
+        return withTiming(() => {
+            const flatNodes = this.createFlatNodeList(document);
+            const rootNodes = this.buildTreeFromFlatList(flatNodes);
+            return DocumentTree.create(document, rootNodes);
+        }, `DocumentParser.fullParse`);
     }
 
     /**
-     * Performs an incremental parse based on document changes. It reuses unchanged nodes
-     * from the previous tree and only re-parses the affected portion of the document,
-     * which is critical for performance.
+     * Performs an incremental parse based on document changes using a "dirty range" strategy.
+     * It finds the top-level nodes affected by the change, re-parses that contiguous block,
+     * and splices the result back into the tree.
      * @param previousTree The `DocumentTree` from before the change.
      * @param changes The content changes from the `onDidChangeTextDocument` event.
+     * @param document The new `vscode.TextDocument` after the changes.
      * @returns A new `DocumentTree` reflecting the applied changes.
      */
-    public parse(previousTree: DocumentTree, changes: readonly vscode.TextDocumentContentChangeEvent[]): DocumentTree {
+    public parse(previousTree: DocumentTree, changes: readonly vscode.TextDocumentContentChangeEvent[], document: vscode.TextDocument): DocumentTree {
         return withTiming(() => {
-            if (changes.length === 0) {
-                return previousTree;
+            if (changes.length === 0 || previousTree.rootNodes.length === 0) {
+                return this.fullParse(document);
             }
 
-        const document = previousTree.document;
-        // Determine the range of lines that need to be re-parsed.
-        // This is from the first changed line to the end of the document.
-        const firstChangedLine = changes.reduce((min, change) => Math.min(min, change.range.start.line), document.lineCount);
+            // 1. Find the range of lines affected by the change in the *old* document.
+            const { oldStartLine, oldEndLine } = this.getOldChangeRange(changes);
 
-        // Get all nodes from the previous tree that are *before* the first changed line.
-        const oldNodesBeforeChange = previousTree.getAllNodesFlat().filter(node => node.lineNumber < firstChangedLine);
+            // 2. Find the top-level root nodes that contain the start and end of the change.
+            let firstDirtyRootIndex = this.findRootNodeIndexAtLine(previousTree, oldStartLine);
 
-        // Create new flat nodes for the changed and subsequent lines.
-        const newlyParsedNodes = this.createFlatNodeList(document, firstChangedLine);
+            // If we can't find the nodes, it's safer to do a full re-parse.
+            if (firstDirtyRootIndex === -1) {
+                return this.fullParse(document);
+            }
 
-        // Combine the unchanged old nodes with the newly parsed nodes.
-        const allNodes = [...oldNodesBeforeChange, ...newlyParsedNodes];
+            // Expand the dirty range to include the previous root node.
+            // This is necessary to correctly handle cases where a node is indented
+            // and becomes a child of the previous node.
+            if (firstDirtyRootIndex > 0) {
+                firstDirtyRootIndex--;
+            }
 
-        // Rebuild the entire tree from the combined flat list.
-        // This ensures that all parent-child relationships are correctly re-established,
-        // even for newly created nodes or structural changes.
-        const rootNodes = this.buildTreeFromFlatList(allNodes);
-        return DocumentTree.create(document, rootNodes);
-        }, `Document parsing for ${previousTree.document.uri.fsPath}`);
+            let lastDirtyRootIndex = this.findRootNodeIndexAtLine(previousTree, oldEndLine);
+
+            // If we can't find the nodes, it's safer to do a full re-parse.
+            if (lastDirtyRootIndex === -1) {
+                // If the end of the change is outside any node, re-parse to the end.
+                lastDirtyRootIndex = previousTree.rootNodes.length - 1;
+            }
+
+            // 3. Determine the text range in the *new* document to re-parse.
+            const firstDirtyNode = previousTree.rootNodes[firstDirtyRootIndex];
+            const lastDirtyNode = previousTree.rootNodes[lastDirtyRootIndex];
+            const lineDelta = document.lineCount - previousTree.document.lineCount;
+            const newReparseStartLine = firstDirtyNode.lineNumber;
+            const newReparseEndLine = lastDirtyNode.getSelfAndDescendants().reduce((max, n) => Math.max(max, n.lineNumber), 0) + lineDelta;
+
+            // 4. Re-parse only that block of text.
+            const newFlatNodes = this.createFlatNodeList(document, newReparseStartLine, newReparseEndLine + 1);
+            const newSubtreeRoots = this.buildTreeFromFlatList(newFlatNodes);
+
+            // 5. Splice the new nodes into the old list of root nodes.
+            const newRootNodes = [
+                ...previousTree.rootNodes.slice(0, firstDirtyRootIndex),
+                ...newSubtreeRoots,
+                ...previousTree.rootNodes.slice(lastDirtyRootIndex + 1)
+            ];
+
+            return DocumentTree.create(document, newRootNodes);
+        }, `DocumentParser.parse`);
+    }
+
+    private findRootNodeIndexAtLine(tree: DocumentTree, lineNumber: number): number {
+        return tree.rootNodes.findIndex(node => {
+            const endLine = node.getSelfAndDescendants().reduce((max, n) => Math.max(max, n.lineNumber), 0);
+            return lineNumber >= node.lineNumber && lineNumber <= endLine;
+        });
+    }
+
+    private getOldChangeRange(changes: readonly vscode.TextDocumentContentChangeEvent[]): { oldStartLine: number, oldEndLine: number } {
+        let oldStartLine = Number.MAX_SAFE_INTEGER;
+        let oldEndLine = 0;
+
+        for (const change of changes) {
+            oldStartLine = Math.min(oldStartLine, change.range.start.line);
+            oldEndLine = Math.max(oldEndLine, change.range.end.line);
+        }
+        return { oldStartLine, oldEndLine };
     }
 
     /**
@@ -65,24 +112,32 @@ export class DocumentParser {
      * @param startLine The line number to start parsing from.
      * @returns An array of `BlockNode`s.
      */
-    private createFlatNodeList(document: vscode.TextDocument, startLine: number = 0): BlockNode[] {
-        const nodes: BlockNode[] = [];
-        let inCodeBlock = false; // State machine for tracking code blocks.
+    private createFlatNodeList(document: vscode.TextDocument, startLine: number = 0, endLine: number = document.lineCount): BlockNode[] {
+        return withTiming(() => {
+            const nodes: BlockNode[] = [];
+            let inCodeBlock = false;
+            for (let i = startLine; i < endLine; i++) {
+                const line = document.lineAt(i);
+                if (!line) {
+                    continue; // Add a guard for lines that might not exist in a transient state
+                }
+                const isDelimiter = line.text.trim().startsWith('```');
+                let isExcluded = isExcludedLine(line);
+                if (isDelimiter) {
+                    inCodeBlock = !inCodeBlock;
+                }
+                isExcluded = isExcluded || (inCodeBlock && !isDelimiter);
 
-        for (let i = startLine; i < document.lineCount; i++) {
-            const line = document.lineAt(i);
-            const isDelimiter = line.text.trim().startsWith('```');
-            let isExcluded = isExcludedLine(line);
+                // Skip empty or whitespace-only lines from being part of the tree,
+                // but only if they are not inside a code block.
+                if (line.isEmptyOrWhitespace && !inCodeBlock) {
+                    continue;
+                }
 
-            if (isDelimiter) {
-                inCodeBlock = !inCodeBlock;
+                nodes.push(new BlockNode(line, i, isExcluded));
             }
-            // A line is excluded if it's a markdown element or inside a code block (but not the delimiter itself).
-            isExcluded = isExcluded || (inCodeBlock && !isDelimiter);
-
-            nodes.push(new BlockNode(line, i, isExcluded));
-        }
-        return nodes;
+            return nodes;
+        }, `createFlatNodeList for lines ${startLine}-${endLine}`);
     }
 
     /**
@@ -93,131 +148,34 @@ export class DocumentParser {
      */
     private buildTreeFromFlatList(nodes: BlockNode[]): BlockNode[] {
         return withTiming(() => {
+            if (nodes.length === 0) {
+                return [];
+            }
+
             const rootNodes: BlockNode[] = [];
-            const parentStack: BlockNode[] = []; // A stack to keep track of the current parent candidates.
-            const processedNodes: BlockNode[] = []; // New array to store nodes with parents set
+            const parentStack: BlockNode[] = []; // Stack of nodes to track hierarchy
 
-            for (const node of nodes) {
-                // Pop parents from the stack until we find a suitable parent for the current node.
-                // A suitable parent must have a smaller indentation level.
-                while (parentStack.length > 0 && node.indent <= parentStack[parentStack.length - 1].indent) {
-                    parentStack.pop();
-                }
-
-                const parent = parentStack.length > 0 ? parentStack[parentStack.length - 1] : undefined;
-                let newNode: BlockNode;
-
-                if (parent) {
-                    // Create a new node with the parent reference set
-                    newNode = node.withParent(parent);
-                } else {
-                    // This is a root node.
-                    newNode = node; // No parent to set, use the original node
-                    rootNodes.push(newNode);
-                }
-
-                processedNodes.push(newNode); // Add the (potentially new) node to the processed list
-
-                // The current node (or its new instance with parent) becomes a potential parent for subsequent, more indented nodes.
-                // Excluded nodes (like headers or lines in code blocks) cannot be parents.
-                if (!newNode.isExcluded) {
-                    parentStack.push(newNode);
-                }
-            }
-
-            // Pass the processed nodes (which now have correct parent references) to reconstructImmutableTree
-            return this.reconstructImmutableTree(processedNodes);
-        }, `buildTreeFromFlatList for ${nodes.length} nodes`);
-    }
-
-    /**
-     * Reconstructs the full immutable tree from a list of nodes that have their parent references set.
-     * This function ensures that all parent and child links point to the correct, final immutable instances.
-     * @param nodes The list of all nodes with their initial parent references set.
-     * @returns An array of root nodes with their children and parent references correctly populated.
-     */
-    private reconstructImmutableTree(nodes: BlockNode[]): BlockNode[] {
-        return withTiming(() => {
-            const newNodesMap = new Map<number, BlockNode>(); // Stores nodes with correct children (from Pass 1)
-            const finalNodesMap = new Map<number, BlockNode>(); // Stores fully linked nodes (from Pass 2)
-            const childrenMap = new Map<number, BlockNode[]>(); // Pre-populate for quick child lookup
-
-            // Pre-populate childrenMap: Map parent line number to an array of its children
-            for (const node of nodes) {
-                if (node.parent) {
-                    if (!childrenMap.has(node.parent.lineNumber)) {
-                        childrenMap.set(node.parent.lineNumber, []);
-                    }
-                    childrenMap.get(node.parent.lineNumber)!.push(node);
-                }
-            }
-
-            // Pass 1 (Reverse Order): Create nodes with correct children
-            // Iterate backward to ensure children are processed and available in newNodesMap before their parents.
-            for (let i = nodes.length - 1; i >= 0; i--) {
-                const oldNode = nodes[i];
-                const childrenOfOldNode = childrenMap.get(oldNode.lineNumber) || [];
-                const newChildren: BlockNode[] = [];
-
-                // Retrieve the final immutable instances of children from newNodesMap
-                for (const child of childrenOfOldNode) {
-                    const newChild = newNodesMap.get(child.lineNumber);
-                    if (newChild) {
-                        newChildren.push(newChild);
-                    }
-                }
-                // Create a new node instance with its correct, immutable children
-                const newNode = oldNode.withChildren(newChildren);
-                newNodesMap.set(newNode.lineNumber, newNode);
-            }
-
-            // Pass 2 (Forward Order): Link nodes to their final parents and ensure children point to final instances
-            // Iterate forward to ensure parents are processed and available in finalNodesMap before their children.
-            for (const oldNode of nodes) {
-                // Get the node instance from Pass 1 (which has correct children)
-                let finalNode = newNodesMap.get(oldNode.lineNumber)!;
-
-                // If the old node had a parent, link it to the final parent instance
-                if (oldNode.parent) {
-                    const finalParent = finalNodesMap.get(oldNode.parent.lineNumber);
-                    if (finalParent) {
-                        finalNode = finalNode.withParent(finalParent);
-                    }
-                }
-
-                // Ensure children of this finalNode also point to their final instances from finalNodesMap
-                // This is crucial because a child's parent might have been updated in this pass,
-                // leading to a new instance of the child being created (if withParent also updates children).
-                // However, since withParent only updates the parent reference of the current node,
-                // and not the children's parent references, we need to ensure the children array
-                // of the current node points to the *final* instances of its children.
-                const updatedChildren: BlockNode[] = [];
-                for (const child of finalNode.children) {
-                    const finalChildInstance = finalNodesMap.get(child.lineNumber);
-                    if (finalChildInstance) {
-                        updatedChildren.push(finalChildInstance);
+            for (const currentNode of nodes) {
+                while (parentStack.length > 0) {
+                    const parentNode = parentStack[parentStack.length - 1];
+                    if (currentNode.indent > parentNode.indent) {
+                        parentNode.addChild(currentNode.withParent(parentNode));
+                        break; // Found parent, break inner loop
                     } else {
-                        // This case should ideally not happen if all nodes are processed correctly,
-                        // but as a fallback, use the child from newNodesMap if not yet in finalNodesMap.
-                        // This might occur if a child is a root node and its parent is processed later.
-                        updatedChildren.push(newNodesMap.get(child.lineNumber)!);
+                        parentStack.pop();
                     }
                 }
-                finalNode = finalNode.withChildren(updatedChildren);
 
-                finalNodesMap.set(finalNode.lineNumber, finalNode);
-            }
+                if (parentStack.length === 0) {
+                    rootNodes.push(currentNode);
+                }
 
-            // Extract Root Nodes: Identify and return the root nodes from the fully reconciled map.
-            const finalRootNodes: BlockNode[] = [];
-            for (const node of nodes) {
-                const finalNode = finalNodesMap.get(node.lineNumber)!;
-                if (!finalNode.parent) {
-                    finalRootNodes.push(finalNode);
+                if (!currentNode.isExcluded) {
+                    parentStack.push(currentNode);
                 }
             }
 
-            return finalRootNodes;
-        }, `reconstructImmutableTree for ${nodes.length} nodes`);
+            return rootNodes;
+        }, `buildTreeFromFlatList for ${nodes.length} nodes`);
     }
 }
