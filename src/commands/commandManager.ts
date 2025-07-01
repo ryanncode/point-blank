@@ -6,7 +6,6 @@ import { PasteWithBullets } from './pasteWithBullets';
 import { EnterKeyHandler } from './enterKey';
 import { getBulletFromLine } from '../utils/bulletPointUtils.vscode';
 import { getBulletStyleFromAdjacentLines } from '../utils/bulletStyleUtils';
-// ...existing code...
 import { Configuration } from '../config/configuration';
 import { QueryService } from '../queries/queryService';
 
@@ -81,6 +80,24 @@ export class CommandManager {
                 await vscode.commands.executeCommand('default:type', args);
                 return;
             }
+
+            // --- Auto-completion Handling ---
+            // Defer to default handler for chars that trigger auto-completion to prevent interference.
+            const autoCompleteChars = ['[', '{', '(', "'", '"'];
+            if (autoCompleteChars.includes(typedChar) && line.text.trim().length === 0) {
+                await vscode.commands.executeCommand('default:type', args);
+                // Now, check if we should add a bullet *before* the auto-completed pair.
+                const lineAfterType = editor.document.lineAt(editor.selection.active.line);
+                if (lineAfterType.text.trim().length > 0) { // Check if something was actually inserted
+                    const indent = line.firstNonWhitespaceCharacterIndex;
+                    const bulletToInsert = getBulletStyleFromAdjacentLines(editor.document, position.line, indent, '• ');
+                    await editor.edit(editBuilder => {
+                        editBuilder.insert(new vscode.Position(position.line, indent), bulletToInsert);
+                    });
+                }
+                return; // Stop further processing
+            }
+
             if (typedChar === '[' && position.character > 0 && line.text.charAt(position.character - 1) === '[') {
                 await vscode.commands.executeCommand('default:type', args);
                 return;
