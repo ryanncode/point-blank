@@ -1,1 +1,5 @@
+title: Point Blank
+description: A VS Code extension for writers who want to outline, write, and manage structured notes in markdown.
+baseurl: "/point-blank"
+url: "https://ryanncode.github.io"
 theme: jekyll-theme-minimal
