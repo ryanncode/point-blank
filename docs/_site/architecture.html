@@ -4,29 +4,36 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Architecture - Point Blank Documentation</title>
-    <link rel="stylesheet" href="/assets/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/point-blank/assets/css/style.css">
 </head>
 <body>
-    <header>
-        <h1>Point Blank Documentation</h1>
-        <nav>
-            <ul>
-                <li><a href="/index.html">Home</a></li>
-                <li><a href="/features.html">Features</a></li>
-                <li><a href="/architecture.html">Architecture</a></li>
-                <li><a href="/contributing.html">Contributing</a></li>
-            </ul>
-        </nav>
-    </header>
-    <main>
-        <section id="architecture-content">
+    <div class="container">
+        <header>
+    <h1>Point Blank Documentation</h1>
+    <nav>
+        <ul>
+            <li><a href="/point-blank/index.html">Home</a></li>
+            <li><a href="/point-blank/features.html">Features</a></li>
+            <li><a href="/point-blank/queries.html">Queries</a></li>
+            <li><a href="/point-blank/commands.html">Commands</a></li>
+            <li><a href="/point-blank/settings.html">Settings</a></li>
+            <li><a href="/point-blank/architecture.html">Architecture</a></li>
+            <li><a href="/point-blank/contributing.html">Contributing</a></li>
+        </ul>
+    </nav>
+</header>
+        <main>
+            <section id="architecture-content">
     <h2>Architecture Overview</h2>
     <p>The extension's architecture is designed to be modular, performant, and maintainable, centered around an immutable document model that serves as the single source of truth.</p>
 
     <h3>Data Flow:</h3>
     <ol>
         <li>When a document is opened or modified, VS Code fires an event that is picked up by the <code>DocumentModel</code>.</li>
-        <li>The <code>DocumentModel</code> uses the <code>DocumentParser</code> to create or update the <code>DocumentTree</code>, an immutable, hierarchical representation of the document's text.</li>
+        <li>The <code>DocumentModel</code> uses the <code>DocumentParser</code> to create or update the <code>DocumentTree</code>, an immutable, hierarchical representation of the document's text. The parser uses a highly efficient "dirty range" incremental strategy to avoid performance bottlenecks in large files.</li>
         <li>The <code>DocumentModel</code> notifies the <code>DecorationManager</code> of the change.</li>
         <li>The <code>DecorationManager</code>, using debouncing and viewport-aware logic, retrieves the visible <code>BlockNode</code>s from the <code>DocumentTree</code>.</li>
         <li>It passes these nodes to the <code>DecorationCalculator</code>, which determines the appropriate decorations for each node based on its properties (e.g., <code>bulletType</code>).</li>
@@ -37,6 +44,9 @@
 
     <h3>Immutable Document Model</h3>
     <p>The use of an immutable <code>DocumentTree</code> and <code>BlockNode</code>s is a cornerstone of the architecture. When the document changes, a new tree is created rather than modifying the old one. This provides predictability, simplifies state management, and makes the flow of data easy to trace.</p>
+
+    <h3>Performant Incremental Parsing</h3>
+    <p>To handle large documents without typing lag, Point Blank employs a "Dirty Range" incremental parser. Instead of performing a full re-parse on every keystroke, the parser identifies the minimal block of top-level nodes affected by a change, re-parses only that block, and splices the result back into the document tree. This ensures the UI remains responsive even in documents with thousands of lines.</p>
 
     <h3>Design Philosophy: Insertion vs. Styling</h3>
     <p>A critical distinction in Point Blank's architecture is the separation between one-time character <strong>insertion</strong> and continuous visual <strong>styling</strong>.</p>
@@ -66,10 +76,11 @@
         <li><strong>Viewport-Aware Rendering:</strong> The <code>DecorationManager</code> only processes the visible portion of the document (plus a small buffer), which significantly improves performance in large files.</li>
     </ul>
 </section>
-    </main>
-    <footer>
-        <p>&copy; 2025 Point Blank. All rights reserved.</p>
-    </footer>
-    <script src="/assets/js/main.js"></script>
+        </main>
+        <footer>
+            <p>&copy; 2025 Point Blank. All rights reserved.</p>
+        </footer>
+    </div>
+    <script src="/point-blank/assets/js/main.js"></script>
 </body>
 </html>

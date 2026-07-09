@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Point Blank Documentation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/point-blank/assets/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+    <h1>Point Blank Documentation</h1>
+    <nav>
+        <ul>
+            <li><a href="/point-blank/index.html">Home</a></li>
+            <li><a href="/point-blank/features.html">Features</a></li>
+            <li><a href="/point-blank/queries.html">Queries</a></li>
+            <li><a href="/point-blank/commands.html">Commands</a></li>
+            <li><a href="/point-blank/settings.html">Settings</a></li>
+            <li><a href="/point-blank/architecture.html">Architecture</a></li>
+            <li><a href="/point-blank/contributing.html">Contributing</a></li>
+        </ul>
+    </nav>
+</header>
+        <main>
+            <h1 id="configuration">Configuration</h1>
+
+<p>Here are the configurable settings for the Point Blank VS Code extension:</p>
+
+<h2 id="settings">Settings</h2>
+
+<p><code class="language-plaintext highlighter-rouge">pointblank.defaultBulletColor</code>
+Color for default bullet decorators.</p>
+
+<p><code class="language-plaintext highlighter-rouge">pointblank.starBulletColor</code>
+Color for ‘*’ bullet decorators.</p>
+
+<p><code class="language-plaintext highlighter-rouge">pointblank.plusBulletColor</code>
+Color for ‘+’ bullet decorators.</p>
+
+<p><code class="language-plaintext highlighter-rouge">pointblank.minusBulletColor</code>
+Color for ‘-‘ bullet decorators.</p>
+
+<p><code class="language-plaintext highlighter-rouge">pointblank.numberedBulletColor</code>
+Color for numbered bullet decorators.</p>
+
+<p><code class="language-plaintext highlighter-rouge">pointblank.blockquoteColor</code>
+Color for blockquote decorators.<br />
+Default: <code class="language-plaintext highlighter-rouge">#808080</code></p>
+
+<p><code class="language-plaintext highlighter-rouge">pointblank.keyValueColor</code>
+The color for Key:: properties.<br />
+Default: <code class="language-plaintext highlighter-rouge">#6c757d</code></p>
+
+<p><code class="language-plaintext highlighter-rouge">pointblank.templates</code>
+Map of type names to their template file paths.<br />
+Default: <code class="language-plaintext highlighter-rouge">{ "Book": ".vscode/templates/book.md", "Person": ".vscode/templates/person.md" }</code></p>
+
+<p><code class="language-plaintext highlighter-rouge">pointblank.debounceDelay</code>
+The debounce delay in milliseconds for document and visible range changes.<br />
+Default: <code class="language-plaintext highlighter-rouge">15</code></p>
+
+<p><code class="language-plaintext highlighter-rouge">pointblank.newFileDirectory</code>
+The default directory for new files created via Quick Open.<br />
+Default: <code class="language-plaintext highlighter-rouge">.</code></p>
+
+<p><code class="language-plaintext highlighter-rouge">pointblank.viewportBuffer</code>
+The number of extra lines to render above and below the visible viewport for decorations.<br />
+Default: <code class="language-plaintext highlighter-rouge">20</code></p>
+
+<p><code class="language-plaintext highlighter-rouge">pointblank.autoBullets</code>
+Automatically insert bullet points on new lines and pastes. Toggle with the Point Blank: Toggle Auto Bullets command.<br />
+Default: <code class="language-plaintext highlighter-rouge">true</code></p>
+
+<p><code class="language-plaintext highlighter-rouge">pointblank.defaultBulletPoint</code>
+The default bullet point character to insert when using Auto Bullets or the Add Bullets to Selection command.
+Default: <code class="language-plaintext highlighter-rouge">- </code></p>
+
+        </main>
+        <footer>
+            <p>&copy; 2025 Point Blank. All rights reserved.</p>
+        </footer>
+    </div>
+    <script src="/point-blank/assets/js/main.js"></script>
+</body>
+</html>
