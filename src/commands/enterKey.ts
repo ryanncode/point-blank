@@ -62,8 +62,17 @@ export class EnterKeyHandler {
         const textAfterCursor = currentLine.text.substring(position.character);
 
         // --- FIX: If at start of line and next chars are already a bullet, just insert blank line ---
+        const config = vscode.workspace.getConfiguration('pointblank');
+        const autoBullets = config.get<boolean>('autoBullets', true);
+
         const atLineStart = position.character === currentLine.firstNonWhitespaceCharacterIndex;
         const bulletMatch = /^([*+-]|\u2022|\d+[\.)]|>)\s/.test(currentLine.text.substring(position.character));
+        
+        if (!autoBullets) {
+            await vscode.commands.executeCommand('default:type', { text: '\n' });
+            return;
+        }
+
         if (atLineStart && bulletMatch) {
             // Insert a blank line with same indentation
             const indentation = currentLine.text.substring(0, currentLine.firstNonWhitespaceCharacterIndex);
