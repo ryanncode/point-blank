@@ -118,10 +118,10 @@ export function activate(context: vscode.ExtensionContext): void {
     // This is used for conditional UI, like the "outdent" command visibility.
     context.subscriptions.push(vscode.window.onDidChangeTextEditorSelection(event => {
         const editor = event.textEditor;
-        if (!editor) return;
+        if (!editor) {return;}
 
         const documentModel = extensionState.getDocumentModel(editor.document.uri.toString());
-        if (!documentModel) return;
+        if (!documentModel) {return;}
 
         const selection = editor.selection;
         let lineHasBullet = false;
