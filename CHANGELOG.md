@@ -2,6 +2,10 @@
 
 All notable changes to the "pointblank" extension will be documented in this file.
 
+## [0.8.1] - 2026-07-09
+### Fixed
+- Downgraded vscode engine requirement to `^1.100.0` to resolve marketplace and local install compatibility issues.
+
 ## [0.8.0] - 2026-07-08
 ### Added
 - **Query System Enhancements**: The inline query language has been massively upgraded!
