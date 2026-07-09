@@ -76,12 +76,10 @@ export class DecorationManager implements vscode.Disposable {
      * It triggers a decoration update to ensure that newly visible lines are decorated correctly.
      */
     private handleVisibilityChange(event: vscode.TextEditorVisibleRangesChangeEvent): void {
-        const activeEditor = vscode.window.activeTextEditor;
-        if (activeEditor && event.textEditor === activeEditor) {
-            const documentModel = this._extensionState.getDocumentModel(activeEditor.document.uri.toString());
-            if (documentModel) {
-                this._debouncedUpdate(activeEditor, documentModel.documentTree);
-            }
+        const editor = event.textEditor;
+        const documentModel = this._extensionState.getDocumentModel(editor.document.uri.toString());
+        if (documentModel) {
+            this._debouncedUpdate(editor, documentModel.documentTree);
         }
     }
 
