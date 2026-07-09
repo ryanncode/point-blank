@@ -59,6 +59,10 @@
       {
         "command": "pointblank.toggleAutoBullets",
         "title": "Point Blank: Toggle Auto Bullets"
+      },
+      {
+        "command": "pointblank.addBulletsToSelection",
+        "title": "Point Blank: Add Bullets to Selection"
       }
     ],
     "keybindings": [
@@ -106,6 +110,11 @@
     "configuration": {
       "title": "Point Blank",
       "properties": {
+        "pointblank.defaultBulletPoint": {
+          "type": "string",
+          "default": "• ",
+          "description": "Default bullet point to use (e.g. '• ', '* ', '- ', '+ '). Must be a standard markdown marker followed by a space."
+        },
         "pointblank.defaultBulletColor": {
           "type": "string",
           "description": "Color for default bullet decorators."

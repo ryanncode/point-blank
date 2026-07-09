@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { AddBulletsToSelection } from './addBulletsToSelection';
 import { ExtensionState } from '../state/extensionState';
 import { DocumentModel } from '../document/documentModel';
 import { BlockNode } from '../document/blockNode';
@@ -259,6 +260,11 @@ export class CommandManager {
             const disposable = vscode.window.setStatusBarMessage(message, 5000);
         });
 
+        const addBulletsToSelectionInstance = new AddBulletsToSelection();
+        const addBulletsToSelectionCommand = vscode.commands.registerCommand('pointblank.addBulletsToSelection', async () => {
+            await addBulletsToSelectionInstance.addBulletsToSelectionCommand();
+        });
+
         // --- Default Behavior Fallbacks ---
         // These commands currently fall back to default behavior but are registered for future extension.
         const deleteRightCommand = vscode.commands.registerTextEditorCommand('pointblank.deleteRight', () => vscode.commands.executeCommand('default:deleteRight'));
@@ -268,6 +274,8 @@ export class CommandManager {
         context.subscriptions.push(
             typeCommand,
             deleteLeftCommand,
+            toggleAutoBulletsCommand,
+            addBulletsToSelectionCommand,
             deleteRightCommand,
             cursorLeftCommand,
             cursorRightCommand,

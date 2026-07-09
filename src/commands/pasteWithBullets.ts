@@ -92,7 +92,8 @@ export class PasteWithBullets {
                     bulletTypeForLine: () => ({ bulletType: 'none' }),
                     getBullet: () => bullet,
                     document,
-                    lineNumber: currentLine.lineNumber
+                    lineNumber: currentLine.lineNumber,
+                    defaultBulletPoint: vscode.workspace.getConfiguration('pointblank').get('defaultBulletPoint', '• ')
                 });
                 await editor.edit(editBuilder => {
                     editBuilder.replace(currentLine.range, newLines.join('\n'));
@@ -127,7 +128,8 @@ export class PasteWithBullets {
                 bulletTypeForLine: () => ({ bulletType: 'none' }),
                 getBullet: () => bullet,
                 document,
-                lineNumber: currentLine.lineNumber
+                lineNumber: currentLine.lineNumber,
+                defaultBulletPoint: vscode.workspace.getConfiguration('pointblank').get('defaultBulletPoint', '• ')
             });
             await editor.edit(editBuilder => {
                 editBuilder.replace(currentLine.range, newLines[0]);

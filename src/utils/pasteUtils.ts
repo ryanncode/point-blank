@@ -7,11 +7,12 @@ export interface SingleLinePasteContext {
     selectionEnd: number;
     currentLineText: string;
     bullet?: string; // The bullet style to use, if provided
+    defaultBulletPoint?: string;
 }
 
 export function processSingleLinePaste(ctx: SingleLinePasteContext): string {
     // Use the provided bullet style, or match the bullet of the current line or adjacent lines if not provided
-    let bullet = ctx.bullet ?? '• ';
+    let bullet = ctx.bullet ?? ctx.defaultBulletPoint ?? '• ';
     const bulletMatch = ctx.currentLineText.match(/^(\s*)([\u2022\-\*\•\+])\s/);
     // If no explicit bullet, try to match from current line, else from adjacent lines (using getBulletStyleFromAdjacentLines)
     if (ctx.bullet === undefined) {
@@ -29,14 +30,14 @@ export function processSingleLinePaste(ctx: SingleLinePasteContext): string {
             } else {
                 targetIndent = clipboardIndent;
             }
-            bullet = getBulletStyleFromAdjacentLines((ctx as any).document, (ctx as any).lineNumber, targetIndent, '• ');
+            bullet = getBulletStyleFromAdjacentLines((ctx as any).document, (ctx as any).lineNumber, targetIndent, ctx.defaultBulletPoint ?? '• ');
         }
     }
     let lineToPaste = ctx.clipboardLine;
     // Only add a bullet if pasting at the start of the line or replacing the whole line/selection
     const isAtLineStart = ctx.selectionStart === 0 && ctx.selectionEnd === 0;
     const isWholeLineSelected = ctx.selectionStart === 0 && ctx.selectionEnd === ctx.currentLineText.length;
-    if ((isAtLineStart || isWholeLineSelected) && !/^\s*([\u2022\-\*\•\+])\s/.test(lineToPaste)) {
+    if ((isAtLineStart || isWholeLineSelected) && !/^\s*([\u2022\-\*\•\+])\s/.test(lineToPaste) && !/^\s*#+\s/.test(lineToPaste)) {
         lineToPaste = bullet + lineToPaste;
     }
     // If current line starts with a bullet, and paste is at or just after the bullet+space, replace bullet+space with the pasted line (with bullet)
@@ -89,6 +90,7 @@ export interface PasteContext {
     document: any;
     lineNumber: number;
     findSiblingBulletByIndent?: (document: any, lineNumber: number, indent: number, defaultBullet: string) => string;
+    defaultBulletPoint?: string;
 }
 
 /**
@@ -107,9 +109,9 @@ export function processClipboardLinesPure(ctx: PasteContext): string[] {
         // Determine indent level for this line
         const thisIndent = pastedIndent.length;
         // For each line, match bullet style from adjacent lines at that indent
-        let bullet = '• ';
+        let bullet = ctx.defaultBulletPoint ?? '• ';
         if (document && typeof lineNumber === 'number') {
-            bullet = getBulletStyleFromAdjacentLines(document, lineNumber, thisIndent, '• ');
+            bullet = getBulletStyleFromAdjacentLines(document, lineNumber, thisIndent, ctx.defaultBulletPoint ?? '• ');
         }
         let finalLine;
         if (i === 0) {
@@ -118,8 +120,8 @@ export function processClipboardLinesPure(ctx: PasteContext): string[] {
             const isWholeLineSelected = partBeforeCursor.length === 0 && partAfterCursor.length === 0 && ctx.currentLineText.length > 0;
             if (isAtLineStart || isWholeLineSelected) {
                 const totalIndent = pastedIndent.length > 0 ? pastedIndent : ' '.repeat(currentLineIndent);
-                // Only add bullet if not already present and not empty/whitespace
-                if (!/^\s*([\u2022\-\*\•\+])\s/.test(content) && content.trim() !== '') {
+                // Only add bullet if not already present, not a header, and not empty/whitespace
+                if (!/^\s*([\u2022\-\*\•\+])\s/.test(content) && !/^\s*#+\s/.test(content) && content.trim() !== '') {
                     content = bullet + content;
                 }
                 finalLine = totalIndent + content + partAfterCursor;
@@ -129,8 +131,8 @@ export function processClipboardLinesPure(ctx: PasteContext): string[] {
             }
         } else {
             // Subsequent lines: just pasted indent
-            // Only add bullet if line is not empty and doesn't already have one
-            if (!/^\s*([\u2022\-\*\•\+])\s/.test(content) && content.trim() !== '') {
+            // Only add bullet if line is not empty, doesn't already have one, and isn't a header
+            if (!/^\s*([\u2022\-\*\•\+])\s/.test(content) && !/^\s*#+\s/.test(content) && content.trim() !== '') {
                 content = bullet + content;
             }
             finalLine = pastedIndent + content;
