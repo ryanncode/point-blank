@@ -9,7 +9,7 @@ import { BlockNode } from '../document/blockNode';
 
 interface Condition {
     key: string;
-    operator?: '::' | '!=' | '>' | '<' | 'AND' | 'OR';
+    operator?: '::' | '!=' | '>' | '<' | '==' | '=' | 'AND' | 'OR';
     value?: string;
 }
 
@@ -17,6 +17,7 @@ interface Query {
     action: 'LIST' | 'TRANSCLUDE'; // New property to specify the action
     source: 'FILES' | 'BLOCKS';
     scope: string; // Can be 'this.file', 'this.folder', 'workspace', or a path string
+    ext?: string; // Optional file extension filter
     whereConjunction?: 'AND' | 'OR'; // To indicate how multiple conditions are joined
     whereConditions: Condition[];
     sortKey?: string;
@@ -57,13 +58,15 @@ export class QueryService {
             return [];
         }
 
+        const extFilter = queryParts.ext ? `**/*${queryParts.ext}` : '**/*.md';
+
         if (queryParts.scope === 'this.file') {
             urisToProcess.push(baseUri);
         } else if (queryParts.scope === 'this.folder') {
             const folderUri = vscode.Uri.file(path.dirname(baseUri.fsPath));
-            urisToProcess = await vscode.workspace.findFiles(new vscode.RelativePattern(folderUri, '**/*.md'), '{**/node_modules/**,**/.vscode/templates/**}');
+            urisToProcess = await vscode.workspace.findFiles(new vscode.RelativePattern(folderUri, extFilter), '{**/node_modules/**,**/.vscode/templates/**}');
         } else if (queryParts.scope === 'workspace') {
-            urisToProcess = await vscode.workspace.findFiles('**/*.md', '{**/node_modules/**,**/.vscode/templates/**}');
+            urisToProcess = await vscode.workspace.findFiles(extFilter, '{**/node_modules/**,**/.vscode/templates/**}');
         } else {
             // Handle path-based scope
             const currentFileDir = path.dirname(baseUri.fsPath);
@@ -81,12 +84,12 @@ export class QueryService {
 
             if (stat.type === vscode.FileType.File) {
                 // If it's a file, add it directly
-                if (scopeUri.fsPath.endsWith('.md')) {
+                if (queryParts.ext || scopeUri.fsPath.endsWith('.md')) {
                     urisToProcess.push(scopeUri);
                 }
             } else if (stat.type === vscode.FileType.Directory) {
                 // If it's a directory, find all markdown files within it
-                urisToProcess = await vscode.workspace.findFiles(new vscode.RelativePattern(scopeUri, '**/*.md'), '{**/node_modules/**,**/.vscode/templates/**}');
+                urisToProcess = await vscode.workspace.findFiles(new vscode.RelativePattern(scopeUri, extFilter), '{**/node_modules/**,**/.vscode/templates/**}');
             } else {
                 console.warn(`Unsupported scope type: ${scopeUri.fsPath}`);
                 return [];
@@ -96,9 +99,15 @@ export class QueryService {
         if (queryParts.source === 'FILES') {
             for (const uri of urisToProcess) {
                 try {
+                    const stat = await vscode.workspace.fs.stat(uri);
                     const document = await vscode.workspace.openTextDocument(uri);
                     const content = document.getText();
                     const properties = this.extractProperties(content);
+                    
+                    properties.set('filename', path.basename(uri.fsPath));
+                    properties.set('creation date', stat.ctime.toString());
+                    properties.set('last updated', stat.mtime.toString());
+                    
                     results.push({ uri, properties });
                 } catch (error) {
                     console.error(`Error reading file ${uri.fsPath}: ${error}`);
@@ -135,9 +144,14 @@ export class QueryService {
                 }
 
                 if (documentModel && documentModel.documentTree) {
+                    const stat = await vscode.workspace.fs.stat(uri);
                     const typedBlocks = this._blockAggregator.findTypedBlocks(documentModel.documentTree);
                     for (const block of typedBlocks) {
-                        results.push({ uri: block.uri, properties: block.properties, startLine: block.startLine });
+                        const props = new Map(block.properties);
+                        props.set('filename', path.basename(uri.fsPath));
+                        props.set('creation date', stat.ctime.toString());
+                        props.set('last updated', stat.mtime.toString());
+                        results.push({ uri: block.uri, properties: props, startLine: block.startLine });
                     }
                 }
             }
@@ -153,6 +167,14 @@ export class QueryService {
             results.sort((a, b) => {
                 const valA = a.properties.get(queryParts.sortKey!) || '';
                 const valB = b.properties.get(queryParts.sortKey!) || '';
+                
+                const numA = parseFloat(valA);
+                const numB = parseFloat(valB);
+                
+                if (!isNaN(numA) && !isNaN(numB) && valA.trim() !== '' && valB.trim() !== '') {
+                    return queryParts.sortOrder === 'DESC' ? numB - numA : numA - numB;
+                }
+                
                 if (queryParts.sortOrder === 'DESC') {
                     return valB.localeCompare(valA);
                 } else {
@@ -243,8 +265,8 @@ export class QueryService {
      *          - `sortOrder`: Optional. 'ASC' or 'DESC' for sorting order.
      */
     public parseQuery(queryString: string): Query | null {
-        // Updated regex to allow 'LIST' or 'TRANSCLUDE' as the action keyword and quoted paths for the IN clause
-        const queryRegex = /^(LIST|TRANSCLUDE)\s+FROM\s+(FILES|BLOCKS)(?:\s+IN\s+("(?:[^"\\]|\\.)*"|this\.file|this\.folder|workspace))?(?:\s+WHERE\s+(.*?))?(?:\s+SORT BY\s+([\w\s]+)\s+(ASC|DESC))?$/i;
+        // Updated regex to allow 'LIST' or 'TRANSCLUDE', optional 'FILES' or 'BLOCKS', optional 'IN', and optional 'EXT'
+        const queryRegex = /^(LIST|TRANSCLUDE)\s+FROM\s+(?:(FILES|BLOCKS)\s+)?(?:(?:IN\s+)?("(?:[^"\\]|\\.)*"|this\.file|this\.folder|workspace))?(?:\s+EXT\s+("(?:[^"\\]|\\.)*"|\S+))?(?:\s+WHERE\s+(.*?))?(?:\s+SORT BY\s+([\w\s]+)\s+(ASC|DESC))?$/i;
         const match = queryString.match(queryRegex);
 
         if (!match) {
@@ -252,15 +274,23 @@ export class QueryService {
         }
 
         const action = match[1].toUpperCase() as 'LIST' | 'TRANSCLUDE';
-        const source = match[2].toUpperCase() as 'FILES' | 'BLOCKS';
+        const source = (match[2] ? match[2].toUpperCase() : 'FILES') as 'FILES' | 'BLOCKS';
         let scope = match[3] || 'workspace';
         // Remove quotes from scope if it's a quoted path
         if (scope.startsWith('"') && scope.endsWith('"')) {
             scope = scope.substring(1, scope.length - 1);
         }
-        const whereClauseString = match[4];
-        const sortKey = match[5];
-        const sortOrder = match[6] ? (match[6].toUpperCase() as 'ASC' | 'DESC') : undefined;
+        
+        let ext = match[4];
+        if (ext) {
+            if (ext.startsWith('"') && ext.endsWith('"') || ext.startsWith("'") && ext.endsWith("'")) {
+                ext = ext.substring(1, ext.length - 1);
+            }
+        }
+
+        const whereClauseString = match[5];
+        const sortKey = match[6];
+        const sortOrder = match[7] ? (match[7].toUpperCase() as 'ASC' | 'DESC') : undefined;
 
         let whereConditions: Condition[] = [];
         let whereConjunction: 'AND' | 'OR' | undefined;
@@ -280,6 +310,7 @@ export class QueryService {
             action: action, // Assign the parsed action
             source: source,
             scope: scope,
+            ext: ext,
             whereConjunction: whereConjunction,
             whereConditions: whereConditions,
             sortKey: sortKey,
@@ -288,10 +319,10 @@ export class QueryService {
     }
 
     private parseCondition(conditionString: string): Condition {
-        const conditionMatch = conditionString.match(/^(\w+)(?:\s*(::|!=|>|<)\s*(.*))?$/);
+        const conditionMatch = conditionString.match(/^(\w+)(?:\s*(::|!=|>|<|==|=)\s*(.*))?$/);
         if (conditionMatch) {
             const key = conditionMatch[1];
-            const operator = conditionMatch[2] as '::' | '!=' | '>' | '<' | undefined;
+            const operator = conditionMatch[2] as '::' | '!=' | '>' | '<' | '==' | '=' | undefined;
             let value = conditionMatch[3];
 
             // Remove quotes from value if present
@@ -339,6 +370,8 @@ export class QueryService {
 
                 switch (condition.operator) {
                     case '::': // Equality or existence check
+                    case '==':
+                    case '=':
                         if (condition.value === undefined || condition.value === '') {
                             return item.properties.has(condition.key); // Key existence check
                         } else {

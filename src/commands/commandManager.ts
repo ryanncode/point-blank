@@ -285,16 +285,10 @@ export class CommandManager {
             toggleAutoBulletsCommand,
             // --- New Commands ---
             vscode.commands.registerTextEditorCommand('pointblank.insertTypeQuery', async (editor) => {
-                const typeName = await vscode.window.showInputBox({
-                    prompt: 'Enter Type Name',
-                    placeHolder: 'e.g., Task, Note'
-                });
+                const typeName = await vscode.window.showInputBox({ prompt: 'Enter the node Type to query for' });
+                if (!typeName) { return; }
 
-                if (!typeName) {
-                    return; // User cancelled
-                }
-
-                const queryString = `LIST FROM BLOCKS WHERE Type::${typeName}`;
+                const queryString = `LIST FROM BLOCKS WHERE Type == ${typeName}`;
                 const parsedQuery = this.queryService.parseQuery(queryString);
                 if (!parsedQuery) {
                     vscode.window.showErrorMessage('Failed to parse query for insertTypeQuery.');
@@ -303,8 +297,7 @@ export class CommandManager {
                 const results = await this.queryService.executeQuery(parsedQuery);
                 // The QueryService now returns fully formatted links (e.g., [[link]] or ![[link]])
                 // so we only need to prepend the list bullet.
-                const formattedResults = results.map(item => `- ${item}`).join('\n');
-                const queryBlock = this._formatQueryBlock(formattedResults, queryString);
+                const queryBlock = this._formatQueryBlock(results, queryString);
 
                 const snippet = new vscode.SnippetString(queryBlock);
                 editor.insertSnippet(snippet, editor.selection.active);
@@ -312,15 +305,14 @@ export class CommandManager {
 
             vscode.commands.registerTextEditorCommand('pointblank.updateTypeQuery', async (editor) => {
                 const document = editor.document;
-                const activePosition = editor.selection.active;
 
                 let queryCommentLine: vscode.TextLine | undefined;
                 let fullQueryString: string | undefined;
 
                 // Search downwards for the query comment
-                for (let i = activePosition.line; i < document.lineCount; i++) {
+                for (let i = editor.selection.start.line; i < document.lineCount; i++) {
                     const line = document.lineAt(i);
-                    const match = line.text.match(/<!-- pointblank:query (.*?) -->/);
+                    const match = line.text.match(/<!-- (?:pointblank|pb):query (.*?) -->/);
                     if (match) {
                         queryCommentLine = line;
                         fullQueryString = match[1].trim();
@@ -341,8 +333,7 @@ export class CommandManager {
                 const results = await this.queryService.executeQuery(parsedQuery);
                 // The QueryService now returns fully formatted links (e.g., [[link]] or ![[link]])
                 // so we only need to prepend the list bullet.
-                const newFormattedResults = results.map(item => `- ${item}`).join('\n');
-                const newQueryBlock = this._formatQueryBlock(newFormattedResults, fullQueryString);
+                const newQueryBlock = this._formatQueryBlock(results, fullQueryString);
 
                 const queryCommentStartLine = queryCommentLine.lineNumber;
                 let resultsStartLine = queryCommentStartLine;
@@ -353,7 +344,7 @@ export class CommandManager {
                     // Stop if we hit another query comment, an empty line, or a line that doesn't look like a result
                     if (
                         line.text.trim() === '' ||
-                        line.text.startsWith('<!-- pointblank:query') ||
+                        line.text.match(/^<!-- (?:pointblank|pb):query/) ||
                         !(line.text.startsWith('- [[') || line.text.startsWith('- ![['))
                     ) {
                         resultsStartLine = i + 1;
@@ -373,8 +364,8 @@ export class CommandManager {
 
                 // Set the cursor position to the start of the query comment line
                 let newQueryCommentLineNumber = resultsStartLine;
-                if (newFormattedResults) {
-                    newQueryCommentLineNumber += newFormattedResults.split('\n').length;
+                if (results.length > 0) {
+                    newQueryCommentLineNumber += results.length;
                 }
                 const newPosition = new vscode.Position(newQueryCommentLineNumber, 0);
                 editor.selection = new vscode.Selection(newPosition, newPosition);
@@ -416,14 +407,15 @@ export class CommandManager {
 
     /**
      * Formats the query results and the query comment into a single string block.
-     * @param formattedResults The string containing the formatted query results.
+     * @param results The array of result strings.
      * @param queryString The original query string.
      * @returns A string representing the complete query block.
      */
-    private _formatQueryBlock(formattedResults: string, queryString: string): string {
-        const queryComment = `<!-- pointblank:query ${queryString} -->`;
-        if (formattedResults) {
-            return `${formattedResults}\n${queryComment}\n`;
+    private _formatQueryBlock(results: string[], queryString: string): string {
+        const queryComment = `<!-- pb:query ${queryString} -->`;
+        const resultsText = results.map(r => `- ${r}`).join('\n');
+        if (resultsText) {
+            return `${resultsText}\n${queryComment}\n`;
         }
         return `${queryComment}\n`;
     }
