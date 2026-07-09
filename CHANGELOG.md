@@ -2,6 +2,24 @@
 
 All notable changes to the "pointblank" extension will be documented in this file.
 
+## [0.8.0] - 2026-07-08
+### Added
+- **Query System Enhancements**: The inline query language has been massively upgraded!
+  - Added support for finding files other than markdown via the new `EXT` clause (e.g. `EXT ".pdf"`).
+  - Added support for the `==` and `=` operators in `WHERE` clauses for exact matching.
+  - Added Intelligent Numerical Sorting logic. `SORT BY` now accurately sorts numerical values instead of relying on alphabetical fallbacks.
+  - Added 3 new virtual properties to query metadata: `filename`, `creation date`, and `last updated` (numerical epochs for flawless sorting).
+  - Added shorthand `pb:query` prefix support as an alternative to `pointblank:query`.
+  - Added support for declaring relative folder paths directly in the query without the `IN` clause.
+- **Add Bullets to Selection Command**: Added a new command to instantly format a multi-line block with the default bullet point (`pointblank.addBulletsToSelection`).
+- **Date Substitution**: Added `$$date$$` keyword substitution for template bodies.
+- **Configurable Default Bullet**: Added the `pointblank.defaultBulletPoint` setting to give you absolute control over what is auto-inserted on new lines or paste operations.
+### Fixed
+- Re-engineered decoration updates to flawlessly re-render when scrolling without any keypress interactions.
+- Prevented auto-bullets from being inappropriately inserted when pressing enter at the absolute beginning of a line with "Toggle Auto Bullet" disabled.
+- Removed the erroneous "No workspace folder is open" warning prompt when a workspace is actually active.
+- Overhauled the documentation site with a gorgeous retro Synthwave aesthetic!
+
 ## [0.7.0] - 2025-06-29
 ### Added
 - You can now select a single-line bullet point for copying, making it easier to duplicate or move bullet items.
