@@ -42,8 +42,12 @@ export async function quickOpenFileCommand(): Promise<void> {
         return;
     }
 
+    const currentDate = new Date().toISOString().split('T')[0];
+    const body = parsedTemplate.body.replace(/\$\$date\$\$/g, currentDate);
+    const frontMatter = parsedTemplate.frontMatter ? parsedTemplate.frontMatter.replace(/\$\$date\$\$/g, currentDate) : null;
+
     // Format the template content with a title line and indented properties.
-    const propertiesText = parsedTemplate.body.split('\n')
+    const propertiesText = body.split('\n')
         .filter(l => l.trim() !== '')
         .map(prop => `\n${prop}`)
         .join('');
@@ -51,8 +55,8 @@ export async function quickOpenFileCommand(): Promise<void> {
     let finalContent = `${propertiesText}`;
 
     // Prepend front matter if it exists
-    if (parsedTemplate.frontMatter) {
-        finalContent = `---\n${parsedTemplate.frontMatter}\n---\n${finalContent}`;
+    if (frontMatter) {
+        finalContent = `---\n${frontMatter}\n---\n${finalContent}`;
     }
 
     // --- Step 3: Determine File Path and Ensure Uniqueness ---

@@ -32,7 +32,8 @@ export async function expandTemplateCommand(typeName: string, documentModel: Doc
         return;
     }
 
-    const templateBody = parsedTemplate.body;
+    const currentDate = new Date().toISOString().split('T')[0];
+    const templateBody = parsedTemplate.body.replace(/\$\$date\$\$/g, currentDate);
 
     const currentIndent = line.text.substring(0, line.firstNonWhitespaceCharacterIndex);
     const propertyIndent = ' '.repeat(tabSize); // Use user's tab size for property indentation
