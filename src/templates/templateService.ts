@@ -33,7 +33,7 @@ export class TemplateService {
         this.templateMap.clear(); // Clear existing map before reloading
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (!workspaceFolders || workspaceFolders.length === 0) {
-            vscode.window.showErrorMessage('Point Blank: No workspace folder is open. Cannot load templates.');
+            console.warn('Point Blank: No workspace folder is open. Cannot load templates.');
             return;
         }
 
