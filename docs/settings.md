@@ -52,3 +52,7 @@ Default: `20`
 `pointblank.autoBullets`
 Automatically insert bullet points on new lines and pastes. Toggle with the Point Blank: Toggle Auto Bullets command.  
 Default: `true`
+
+`pointblank.defaultBulletPoint`
+The default bullet point character to insert when using Auto Bullets or the Add Bullets to Selection command.
+Default: `- `
